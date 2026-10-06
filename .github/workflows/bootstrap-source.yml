@@ -18,7 +18,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat .bootstrap/part-* > /tmp/source.b64
+          cat .bootstrap/source.tar.gz.b64 > /tmp/source.b64
           base64 -d /tmp/source.b64 > /tmp/source.tar.gz
           find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           tar -xzf /tmp/source.tar.gz -C .
