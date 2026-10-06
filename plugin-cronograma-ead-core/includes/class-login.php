@@ -38,7 +38,7 @@ class Cronograma_EAD_Login {
 	}
 
 	public static function estilo() {
-		echo str_replace( '%LOGO%', esc_url( CRONOGRAMA_EAD_URL . 'assets/img/senai-logo.png' ), '<style id="ce-login">
+		$css = str_replace( '%LOGO%', esc_url( CRONOGRAMA_EAD_URL . 'assets/img/senai-logo.png' ), '<style id="ce-login">
 :root{--az:#0a4ba0;--az2:#0077f2;--tx:#1d2733;--mut:#6b7785}
 body.login{background:#f6f8fb;color:var(--tx);font-family:"Inter","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;display:flex;align-items:center;min-height:100vh;padding:24px 0;position:relative;overflow-x:hidden}
 body.login::before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(520px 320px at var(--x,50%) var(--y,35%),rgba(0,119,242,.16),transparent 70%);transition:background .15s}
@@ -95,6 +95,7 @@ body.login.login-action-login #nav{display:none}
 @media (max-width:480px){body.login #login{max-width:none;margin:0 16px;padding:26px 22px 22px}body.login form .forgetmenot,body.login form .ce-lost{width:100%;text-align:left;margin:0 0 14px}}
 @media (prefers-reduced-motion:reduce){body.login *,body.login #login,.ce-linha span:after{animation:none!important;transition:none!important}}
 </style>' );
+		echo wp_kses( $css, array( 'style' => array( 'id' => true ) ) );
 	}
 
 	/** Mensagens de erro de entrada em português e sem revelar se o usuário existe. */
