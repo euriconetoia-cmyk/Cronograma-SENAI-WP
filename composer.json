@@ -1,0 +1,19 @@
+{
+  "name": "unidigital/cronograma-ead-quality",
+  "description": "Ferramentas de qualidade do Cronogramas EaD",
+  "type": "project",
+  "require-dev": {
+    "squizlabs/php_codesniffer": "^3.10",
+    "wp-coding-standards/wpcs": "^3.1",
+    "phpstan/phpstan": "^1.12"
+  },
+  "scripts": {
+    "phpcs": "phpcs -p",
+    "phpstan": "phpstan analyse --no-progress"
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  }
+}

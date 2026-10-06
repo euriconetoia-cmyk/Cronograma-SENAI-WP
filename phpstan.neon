@@ -1,0 +1,9 @@
+parameters:
+  level: 4
+  paths:
+    - plugin-cronograma-ead-core/includes
+  excludePaths:
+    analyse:
+      - plugin-cronograma-ead-core/assets
+  bootstrapFiles: []
+  treatPhpDocTypesAsCertain: false

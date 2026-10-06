@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<ruleset name="Cronogramas EaD">
+  <description>WordPress Coding Standards para o plugin e tema.</description>
+  <file>plugin-cronograma-ead-core</file>
+  <file>theme-cronograma-ead-theme</file>
+  <exclude-pattern>*/assets/app.js</exclude-pattern>
+  <rule ref="WordPress-Core"/>
+  <rule ref="WordPress-Extra"/>
+  <rule ref="WordPress-Docs"/>
+  <config name="minimum_supported_wp_version" value="6.0"/>
+</ruleset>

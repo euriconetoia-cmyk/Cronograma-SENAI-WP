@@ -1,0 +1,1 @@
+Teste automatizado em WordPress 6.5 real + MariaDB. e2e.mjs percorre login, páginas, API, permissões por perfil e fluxo solicitado→validado→reaberto.
