@@ -2,7 +2,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main, master]
+    branches: [main, master, 'release/2.19.0-rc1']
 permissions:
   contents: read
 jobs:
