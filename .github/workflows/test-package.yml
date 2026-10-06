@@ -18,7 +18,7 @@ jobs:
         run: corepack enable && corepack prepare pnpm@10.17.1 --activate
       - name: Install frontend dependencies
         working-directory: ui
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
       - name: Build WordPress frontend
         working-directory: ui
         run: pnpm build:wp
