@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<ruleset name="Cronogramas EaD Security Gate">
+  <description>Portão PHPCS focado em segurança de entrada, saída, nonce e SQL. Padronização editorial completa é tratada separadamente para o legado.</description>
+  <file>plugin-cronograma-ead-core</file>
+  <file>theme-cronograma-ead-theme</file>
+  <exclude-pattern>*/assets/app.js</exclude-pattern>
+  <exclude-pattern>*/assets/*.js</exclude-pattern>
+  <exclude-pattern>*/style.css</exclude-pattern>
+
+  <rule ref="WordPress.Security.EscapeOutput"/>
+  <rule ref="WordPress.Security.ValidatedSanitizedInput"/>
+  <rule ref="WordPress.Security.NonceVerification"/>
+  <rule ref="WordPress.DB.PreparedSQL"/>
+  <rule ref="WordPress.DB.PreparedSQLPlaceholders"/>
+
+  <config name="minimum_supported_wp_version" value="6.0"/>
+</ruleset>

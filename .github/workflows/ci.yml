@@ -1,0 +1,47 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main, master, 'release/2.19.0-rc1']
+permissions:
+  contents: read
+jobs:
+  release-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.17.1 --activate
+      - name: Install PHP quality dependencies
+        run: composer install --no-interaction --prefer-dist
+      - name: PHPCS
+        run: composer phpcs
+      - name: PHPStan
+        run: composer phpstan
+      - name: Execute full release gate
+        run: bash tests/release-gate.sh
+      - name: Package plugin and theme
+        run: bash scripts/package-release.sh
+      - if: always()
+        run: docker compose logs --no-color > docker-e2e.log || true
+      - if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cronograma-ead-2.19.0-rc1
+          path: |
+            dist/*.zip
+            plugin-cronograma-ead-core/assets/app.js
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-evidence
+          path: |
+            docker-e2e.log
+            docs/TEST-REPORT.md

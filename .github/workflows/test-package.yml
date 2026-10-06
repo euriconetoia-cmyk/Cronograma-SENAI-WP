@@ -1,0 +1,48 @@
+name: Test package
+on:
+  push:
+    branches:
+      - release/2.19.0-rc1
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Enable pnpm
+        run: corepack enable && corepack prepare pnpm@10.17.1 --activate
+      - name: Install frontend dependencies
+        working-directory: ui
+        run: pnpm install --no-frozen-lockfile
+      - name: Build WordPress frontend
+        working-directory: ui
+        run: pnpm build:wp
+      - name: PHP syntax check
+        run: bash tests/php-syntax.sh
+      - name: Calendar contract
+        run: |
+          php tests/unit-rules.php
+          node tests/calendar-contract.mjs
+      - name: Static security checks
+        run: node tests/security-static.mjs
+      - name: Build test ZIPs
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf test-dist
+          mkdir -p test-dist/plugin test-dist/theme
+          cp -R plugin-cronograma-ead-core test-dist/plugin/cronograma-ead-core
+          cp -R theme-cronograma-ead-theme test-dist/theme/cronograma-ead-theme
+          (cd test-dist/plugin && zip -qr ../cronograma-ead-core-2.19.0-rc1-TESTE.zip cronograma-ead-core)
+          (cd test-dist/theme && zip -qr ../cronograma-ead-theme-2.19.0-rc1-TESTE.zip cronograma-ead-theme)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cronograma-ead-2.19.0-rc1-TESTE
+          path: |
+            test-dist/*.zip
+            plugin-cronograma-ead-core/assets/app.js
