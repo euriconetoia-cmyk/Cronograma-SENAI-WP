@@ -186,3 +186,52 @@ export function duracaoEventoItem(item: ItemLike, curso: CursoLike, tipo: TipoEv
   const perfil = resolverPerfilItem(item, curso)
   return numeroPositivo(perfil[tipo].duracaoHoras, tipo === 'presencial' ? 8 : 2) || (tipo === 'presencial' ? 8 : 2)
 }
+
+
+export const MODELO_LABEL: Record<ModeloCronograma, string> = {
+  tecnico: 'Técnico',
+  qualificacao: 'Qualificação',
+  distribuicao_diaria: 'Distribuição diária',
+  aprendizagem: 'Aprendizagem',
+  personalizado: 'Personalizado',
+}
+
+export function mesclarConfiguracaoCronograma(base: ConfigParcial = {}, override: ConfigParcial = {}): ConfigParcial {
+  return {
+    ...base,
+    ...override,
+    presencial: override.presencial ? { ...(base.presencial || {}), ...override.presencial } : base.presencial,
+    sincrono: override.sincrono ? { ...(base.sincrono || {}), ...override.sincrono } : base.sincrono,
+    aprendizagem: override.aprendizagem ? { ...(base.aprendizagem || {}), ...override.aprendizagem } : base.aprendizagem,
+    diasEstudoPermitidos: override.diasEstudoPermitidos ?? base.diasEstudoPermitidos,
+  }
+}
+
+export function aplicarConfiguracaoTurma<T extends CursoLike & { configuracaoCronograma?: ConfigParcial }>(
+  curso: T,
+  turma?: { personalizarCronograma?: boolean; configuracaoCronograma?: ConfigParcial }
+): T {
+  if (!turma?.personalizarCronograma) return curso
+  return {
+    ...curso,
+    configuracaoCronograma: mesclarConfiguracaoCronograma(curso.configuracaoCronograma || {}, turma.configuracaoCronograma || {}),
+  }
+}
+
+export function validarConfiguracaoModelo(curso: CursoLike): string[] {
+  const p = resolverPerfilCronograma(curso)
+  const erros: string[] = []
+  if (p.modelo === 'distribuicao_diaria' && (!p.cargaDiaria || p.cargaDiaria <= 0)) erros.push('Informe uma carga diária maior que zero.')
+  if (p.modelo === 'aprendizagem') {
+    const a = p.aprendizagem
+    if (!a) erros.push('Configuração de Aprendizagem ausente.')
+    else {
+      if (a.faseIntensivaDiasUteis > 0 && a.diasIntensivos.length === 0) erros.push('Selecione ao menos um dia para a fase intensiva.')
+      if (a.diasAtendimentoRegular.length === 0) erros.push('Selecione ao menos um dia para o atendimento semanal.')
+      if (a.duracaoWebaulaHoras <= 0) erros.push('A duração da webaula deve ser maior que zero.')
+    }
+  }
+  if (p.presencial.ativo && p.presencial.diasPermitidos.length === 0) erros.push('Selecione ao menos um dia para encontros presenciais.')
+  if (p.sincrono.ativo && p.sincrono.diasPermitidos.length === 0) erros.push('Selecione ao menos um dia para momentos síncronos.')
+  return erros
+}
