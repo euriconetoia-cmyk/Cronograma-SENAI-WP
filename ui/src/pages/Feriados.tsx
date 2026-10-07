@@ -20,15 +20,26 @@ export function FeriadosPage() {
   const [motivo, setMotivo] = useState('')
   const [sincronizando, setSincronizando] = useState(false)
   const sincronizados = useRef(new Set<string>())
-  const mapa = useMemo(() => new Map(d.feriados.filter(f => (f[2] || '') === escopo).map(f => [f[0], f[1]])), [d.feriados, escopo])
-  const gerais = useMemo(() => new Set(d.feriados.filter(f => !f[2]).map(f => f[0])), [d.feriados])
-  const lista = d.feriados.map((f, i) => ({ f, i })).filter(x => x.f[0].startsWith(ano) && (x.f[2] || '') === escopo)
   const unidadeAtual = d.unidades.find(u => u.id === escopo)
+  const lista = useMemo(() => d.feriados
+    .map((f, i) => ({ f, i }))
+    .filter(x => x.f[0].startsWith(ano) && (escopo ? (!x.f[2] || x.f[2] === escopo) : !x.f[2]))
+    .sort((a, b) => a.f[0].localeCompare(b.f[0]) || a.f[1].localeCompare(b.f[1])), [d.feriados, ano, escopo])
+  const mapa = useMemo(() => {
+    const m = new Map<string, typeof lista>()
+    for (const item of lista) {
+      const atual = m.get(item.f[0]) || []
+      atual.push(item)
+      m.set(item.f[0], atual)
+    }
+    return m
+  }, [lista])
 
   const add = (dt: string, m?: string) => {
     if (!dt) { toast(T.feriados.escolhaData); return }
-    if (mapa.has(dt)) { toast(T.feriados.jaExiste); return }
-    update(x => { x.feriados.push(escopo ? [dt, (m ?? motivo).trim() || T.feriados.padrao, escopo] : [dt, (m ?? motivo).trim() || T.feriados.padrao]); x.feriados.sort((a, b) => (a[0] < b[0] ? -1 : 1)) })
+    const jaNoEscopo = d.feriados.some(f => f[0] === dt && (f[2] || '') === escopo)
+    if (jaNoEscopo) { toast(T.feriados.jaExiste); return }
+    update(x => { x.feriados.push(escopo ? [dt, (m ?? motivo).trim() || T.feriados.padrao, escopo, 'institucional', 'Manual'] : [dt, (m ?? motivo).trim() || T.feriados.padrao, undefined, 'institucional', 'Manual']); x.feriados.sort((a, b) => (a[0] < b[0] ? -1 : 1)) })
     setAno(dt.slice(0, 4)); setData(''); toast(T.feriados.adicionada)
   }
   const remover = (dt: string) => update(x => { x.feriados = x.feriados.filter(f => !(f[0] === dt && (f[2] || '') === escopo)) })
@@ -38,14 +49,17 @@ export function FeriadosPage() {
     setSincronizando(true)
     try {
       const r = await api.feriadosNacionais(+ano)
-      const existentes = new Set(d.feriados.filter(x => !x[2]).map(x => x[0]))
-      const novos = r.feriados.filter(x => !existentes.has(x[0]))
-      if (novos.length) update(x => {
-        for (const h of novos) x.feriados.push([h[0], h[1]])
+      let novosCount = 0
+      update(x => {
+        for (const h of r.feriados) {
+          const ex = x.feriados.find(f => f[0] === h[0] && !f[2] && (f[3] === 'nacional' || !f[3]))
+          if (ex) { ex[1] = h[1]; ex[3] = 'nacional'; ex[4] = 'BrasilAPI' }
+          else { x.feriados.push([h[0], h[1], undefined, 'nacional', 'BrasilAPI']); novosCount++ }
+        }
         x.feriados.sort((a, b) => a[0].localeCompare(b[0]))
       })
       sincronizados.current.add(ano)
-      if (forcar) toast(novos.length ? `${novos.length} feriado(s) nacional(is) adicionado(s).` : 'Feriados nacionais já estavam atualizados.')
+      if (forcar) toast(novosCount ? `${novosCount} feriado(s) nacional(is) adicionado(s).` : 'Feriados nacionais já estavam atualizados.')
     } catch (e) {
       if (forcar) toast(e instanceof Error ? e.message : 'Não foi possível atualizar os feriados nacionais.')
     } finally { setSincronizando(false) }
@@ -56,8 +70,13 @@ export function FeriadosPage() {
     if (!equipe || !escopo) return
     setSincronizando(true)
     try {
-      const r = await api.feriadosLocal(escopo, +ano)
+      const [nac, r] = await Promise.all([api.feriadosNacionais(+ano), api.feriadosLocal(escopo, +ano)])
       update(x => {
+        for (const h of nac.feriados) {
+          const ex = x.feriados.find(f => f[0] === h[0] && !f[2] && (f[3] === 'nacional' || !f[3]))
+          if (ex) { ex[1] = h[1]; ex[3] = 'nacional'; ex[4] = 'BrasilAPI' }
+          else x.feriados.push([h[0], h[1], undefined, 'nacional', 'BrasilAPI'])
+        }
         x.feriados = x.feriados.filter(f => !(f[2] === escopo && f[0].startsWith(ano) && (f[3] === 'estadual' || f[3] === 'municipal')))
         for (const h of r.feriados) x.feriados.push([h[0], h[1], escopo, h[2], h[3]])
         x.feriados.sort((a, b) => a[0].localeCompare(b[0]))
@@ -66,10 +85,10 @@ export function FeriadosPage() {
       })
       const est = r.feriados.filter(h => h[2] === 'estadual').length
       const mun = r.feriados.filter(h => h[2] === 'municipal').length
-      toast(`Calendário de ${r.localidade.cidade}/${r.localidade.uf} atualizado: ${est} estadual(is) e ${mun} municipal(is).`)
+      toast(`Calendário completo de ${r.localidade.cidade}/${r.localidade.uf}: ${nac.feriados.length} nacional(is), ${est} estadual(is) e ${mun} municipal(is).`)
       r.avisos.forEach(a => toast(a))
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Não foi possível atualizar o calendário local.')
+      toast(e instanceof Error ? e.message : 'Não foi possível atualizar o calendário completo da unidade.')
     } finally { setSincronizando(false) }
   }
 
@@ -101,11 +120,16 @@ export function FeriadosPage() {
                 <div className="grid grid-cols-7 gap-px">
                   {Array.from({ length: off }).map((_, i) => <span key={`o${i}`} />)}
                   {Array.from({ length: dias }).map((_, i) => {
-                    const key = `${ano}-${pad(m + 1)}-${pad(i + 1)}`, wk = (off + i) % 7, fim = wk === 0 || wk === 6, h = mapa.get(key), geral = !!escopo && gerais.has(key)
+                    const key = `${ano}-${pad(m + 1)}-${pad(i + 1)}`, wk = (off + i) % 7, fim = wk === 0 || wk === 6
+                    const hs = mapa.get(key) || []
+                    const temNacional = hs.some(x => !x.f[2] && (x.f[3] === 'nacional' || !x.f[3]))
+                    const temRegional = hs.some(x => x.f[2] === escopo && (x.f[3] === 'estadual' || x.f[3] === 'municipal'))
+                    const temInstitucional = hs.some(x => x.f[3] === 'institucional')
+                    const titulo = hs.length ? hs.map(x => `${x.f[1]} [${x.f[3] || (!x.f[2] ? 'nacional' : 'institucional')}]`).join(' · ') : 'Clique para marcar uma data institucional'
                     return (
-                      <button key={key} type="button" title={h ? `${h} (clique para remover)` : 'Clique para marcar como feriado'}
-                        disabled={!equipe} onClick={() => (h ? remover(key) : add(key, motivo))}
-                        className={`mono h-6 rounded-sm text-[11px] ${h ? 'bg-warn font-semibold text-card' : geral ? 'bg-warn-soft text-warn' : fim ? 'text-muted-foreground/60 hover:bg-secondary' : 'hover:bg-accent'}`}>{i + 1}</button>
+                      <button key={key} type="button" title={titulo}
+                        disabled={!equipe} onClick={() => hs.length ? toast(titulo) : add(key, motivo)}
+                        className={`mono h-6 rounded-sm text-[11px] ${temRegional ? 'bg-primary font-semibold text-primary-foreground' : temNacional ? 'bg-warn font-semibold text-card' : temInstitucional ? 'bg-secondary font-semibold text-foreground' : fim ? 'text-muted-foreground/60 hover:bg-secondary' : 'hover:bg-accent'}`}>{i + 1}</button>
                     )
                   })}
                 </div>
@@ -113,7 +137,12 @@ export function FeriadosPage() {
             )
           })}
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">{T.feriados.legenda} Clique em um dia para marcar ou desmarcar.</p>
+        <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
+          <span><b className="text-warn">■</b> Nacional</span>
+          <span><b className="text-primary">■</b> Estadual / Municipal</span>
+          <span><b>■</b> Institucional</span>
+          <span>Todos são tratados como dias não úteis no cálculo da unidade.</span>
+        </div>
       </Panel>
 
       <Panel title={`Datas de ${ano} (${lista.length})`}>
@@ -125,18 +154,22 @@ export function FeriadosPage() {
         <div className="max-h-[520px] overflow-auto rounded-md border">
           <table className="w-full text-[13px]">
             <tbody>
-              {lista.map(({ f, i }) => (
-                <tr key={f[0]} className="border-b last:border-0">
+              {lista.map(({ f, i }) => {
+                const herdado = !!escopo && !f[2]
+                const tipo = f[3] || (!f[2] ? 'nacional' : 'institucional')
+                return (
+                <tr key={`${f[0]}-${i}`} className="border-b last:border-0">
                   <td className="mono whitespace-nowrap px-2 py-1">{fmt(f[0])}</td>
                   <td className="px-1">
                     <div className="flex items-center gap-2">
-                      <input disabled={!equipe} aria-label={`Motivo de ${f[0]}`} className="cell-input" value={f[1]} onChange={e => update(x => { x.feriados[i][1] = e.target.value })} />
-                      {f[3] && <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${f[3] === 'municipal' ? 'bg-primary/10 text-primary' : f[3] === 'estadual' ? 'bg-accent text-foreground' : 'bg-secondary text-muted-foreground'}`}>{f[3]}</span>}
+                      <input disabled={!equipe || herdado} aria-label={`Motivo de ${f[0]}`} className="cell-input" value={f[1]} onChange={e => update(x => { x.feriados[i][1] = e.target.value })} />
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${tipo === 'municipal' ? 'bg-primary/10 text-primary' : tipo === 'estadual' ? 'bg-accent text-foreground' : tipo === 'nacional' ? 'bg-warn-soft text-warn' : 'bg-secondary text-muted-foreground'}`}>{tipo}</span>
+                      {herdado && <span className="text-[10px] text-muted-foreground">herdado</span>}
                     </div>
                   </td>
-                  <td className="px-1 text-right">{equipe && <Button size="icon" variant="ghost" className="text-destructive" aria-label={`Remover ${f[0]}`} onClick={() => remover(f[0])}><Trash2 size={14} /></Button>}</td>
+                  <td className="px-1 text-right">{equipe && !herdado && <Button size="icon" variant="ghost" className="text-destructive" aria-label={`Remover ${f[0]}`} onClick={() => remover(f[0])}><Trash2 size={14} /></Button>}</td>
                 </tr>
-              ))}
+              )})}
             </tbody>
           </table>
         </div>
