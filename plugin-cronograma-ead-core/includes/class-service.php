@@ -654,6 +654,41 @@ class Cronograma_EAD_Service {
 		return $saved;
 	}
 
+	/** Normaliza objetos associativos antes do hash para sobreviver ao transporte JSON/REST. */
+	private static function canonicalizar_backup( $valor ) {
+		if ( ! is_array( $valor ) ) {
+			return $valor;
+		}
+		$keys = array_keys( $valor );
+		$is_list = $keys === range( 0, count( $valor ) - 1 );
+		$out = array();
+		if ( $is_list ) {
+			foreach ( $valor as $item ) {
+				$out[] = self::canonicalizar_backup( $item );
+			}
+			return $out;
+		}
+		ksort( $valor, SORT_STRING );
+		foreach ( $valor as $key => $item ) {
+			$out[ $key ] = self::canonicalizar_backup( $item );
+		}
+		return $out;
+	}
+
+	private static function checksum_backup( $catalogo, $turmas ) {
+		return hash(
+			'sha256',
+			wp_json_encode(
+				self::canonicalizar_backup(
+					array(
+						'catalogo' => $catalogo,
+						'turmas' => $turmas,
+					)
+				)
+			)
+		);
+	}
+
 	/** Consulta e armazena em cache os feriados nacionais brasileiros. */
 	public static function feriados_nacionais( $ano ) {
 		$ano = (int) $ano;
@@ -708,7 +743,7 @@ class Cronograma_EAD_Service {
 			'applicationVersion' => CRONOGRAMA_EAD_VERSION,
 			'generatedAt' => gmdate( 'c' ),
 			'siteId' => hash( 'sha256', home_url( '/' ) ),
-			'checksum' => hash( 'sha256', wp_json_encode( $data ) ),
+			'checksum' => self::checksum_backup( $cat['data'], $turmas ),
 			'catalogo' => $cat['data'],
 			'turmas' => $turmas,
 		);
@@ -736,8 +771,10 @@ class Cronograma_EAD_Service {
 			if ( 'cronogramas-ead' !== $format || empty( $body['checksum'] ) ) {
 				return self::erro( 'formato', 'Backup sem identificação ou checksum válido.', 422 );
 			}
-			$calc = hash( 'sha256', wp_json_encode( array( 'catalogo' => $body['catalogo'], 'turmas' => $body['turmas'] ) ) );
-			if ( ! hash_equals( (string) $body['checksum'], $calc ) ) {
+			$calc = self::checksum_backup( $body['catalogo'], $body['turmas'] );
+			// Compatibilidade com backups v3/v4 gerados antes do checksum canônico.
+			$legacy_calc = hash( 'sha256', wp_json_encode( array( 'catalogo' => $body['catalogo'], 'turmas' => $body['turmas'] ) ) );
+			if ( ! hash_equals( (string) $body['checksum'], $calc ) && ! hash_equals( (string) $body['checksum'], $legacy_calc ) ) {
 				return self::erro( 'checksum', 'A cópia falhou na verificação de integridade.', 422 );
 			}
 		}
