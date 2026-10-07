@@ -17,7 +17,7 @@ export type Modalidade = 'ead' | 'semipresencial'
 export type Categoria = 'iniciacao' | 'aprendizagem_basica' | 'qualificacao' | 'aperfeicoamento' | 'especializacao_prof' | 'aprendizagem_tecnica' | 'tecnico' | 'curso_livre' | 'graduacao_tecnologica' | 'graduacao' | 'pos_graduacao' | 'mestrado_doutorado'
 export interface Curso { id: string; nome: string; categoria?: Categoria | ''; modalidade?: Modalidade | ''; modeloCronograma?: ModeloCronograma; configuracaoCronograma?: ConfiguracaoCronograma; chTotal: number; nota: string; regras: Regras; modulos: Modulo[]; resumo?: boolean }
 export interface Pessoa { id: string; nome: string; papel: Papel }
-export interface Unidade { id: string; nome: string; cidade?: string; estado: string }
+export interface Unidade { id: string; nome: string; cidade?: string; estado: string; codigoIbge?: string }
 export interface Encontro { d: string; h: string; w: string }
 export interface EventoPedagogico { id?: string; tipo: TipoEventoPedagogico; d: string; fim?: string; h?: string; duracaoHoras?: number; titulo?: string; observacao?: string }
 export interface ItemTurma {
@@ -33,8 +33,9 @@ export interface Turma {
   itens: Record<string, ItemTurma>
   status: Status; versao: number; rev: number; prazo: string; vigente: Vigente | null
 }
-/** [data, motivo, unidadeId?] — sem unidade vale para todas. */
-export type Feriado = [string, string, string?]
+/** [data, motivo, unidadeId?, tipo?, origem?] — sem unidade vale para todas. */
+export type TipoFeriado = 'nacional' | 'estadual' | 'municipal' | 'institucional' | 'ponto_facultativo'
+export type Feriado = [string, string, string?, TipoFeriado?, string?]
 export interface Catalogo { cursos: Curso[]; pessoas: Pessoa[]; feriados: Feriado[]; unidades: Unidade[] }
 export interface Dados extends Catalogo { turmas: Turma[] }
 export interface Me { id: number; nome: string; perfil: Perfil; unidades: string[]; validador: boolean; prazoDias: number; podeEquipe?: boolean }
