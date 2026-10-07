@@ -99,21 +99,19 @@ class Cronograma_EAD_Admin {
 				Feriados: <strong><?php echo count( $d['feriados'] ); ?></strong>
 			</p>
 			<p><a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=cronograma_ead_export' ), 'cronograma_ead_export' ) ); ?>">Baixar cópia dos dados (.json)</a></p>
-			<?php if ( current_user_can( Cronograma_EAD_Roles::CAP_CONFIG ) ) : ?>
-				<?php $saude = Cronograma_EAD_Service::saude(); ?>
-				<h2>Saúde do sistema</h2>
-				<table class="widefat striped" style="max-width:720px">
-					<tbody>
-						<tr><th>Plugin</th><td><?php echo esc_html( $saude['pluginVersion'] ); ?></td></tr>
-						<tr><th>Schema do banco</th><td><?php echo esc_html( $saude['dbVersion'] ); ?></td></tr>
-						<tr><th>Tabelas</th><td><?php echo esc_html( implode( ', ', array_map( function ( $k, $ok ) { return $k . ': ' . ( $ok ? 'OK' : 'FALTA' ); }, array_keys( $saude['tables'] ), array_values( $saude['tables'] ) ) ) ); ?></td></tr>
-						<tr><th>Último cron</th><td><?php echo esc_html( $saude['cron']['lastRun'] ?: 'Ainda não executado' ); ?></td></tr>
-						<tr><th>Próximo cron</th><td><?php echo esc_html( $saude['cron']['nextRun'] ?: 'Não agendado' ); ?></td></tr>
-						<tr><th>Turmas</th><td><?php echo (int) $saude['turmas']; ?></td></tr>
-						<tr><th>Backup pré-importação</th><td><?php echo esc_html( $saude['lastPreImportBackup'] ?: 'Ainda não gerado' ); ?></td></tr>
-					</tbody>
-				</table>
-			<?php endif; ?>
+			<?php $saude = Cronograma_EAD_Service::saude(); ?>
+			<h2>Saúde do sistema</h2>
+			<table class="widefat striped" style="max-width:720px">
+				<tbody>
+					<tr><th>Plugin</th><td><?php echo esc_html( $saude['pluginVersion'] ); ?></td></tr>
+					<tr><th>Schema do banco</th><td><?php echo esc_html( $saude['dbVersion'] ); ?></td></tr>
+					<tr><th>Tabelas</th><td><?php echo esc_html( implode( ', ', array_map( function ( $k, $ok ) { return $k . ': ' . ( $ok ? 'OK' : 'FALTA' ); }, array_keys( $saude['tables'] ), array_values( $saude['tables'] ) ) ) ); ?></td></tr>
+					<tr><th>Último cron</th><td><?php echo esc_html( $saude['cron']['lastRun'] ?: 'Ainda não executado' ); ?></td></tr>
+					<tr><th>Próximo cron</th><td><?php echo esc_html( $saude['cron']['nextRun'] ?: 'Não agendado' ); ?></td></tr>
+					<tr><th>Turmas</th><td><?php echo (int) $saude['turmas']; ?></td></tr>
+					<tr><th>Backup pré-importação</th><td><?php echo esc_html( $saude['lastPreImportBackup'] ?: 'Ainda não gerado' ); ?></td></tr>
+				</tbody>
+			</table>
 
 			<?php if ( current_user_can( 'manage_options' ) ) : ?>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Isto troca cursos, equipe, feriados e unidades pelos dados de exemplo e recoloca a turma de exemplo. Turmas que você criou continuam. Continuar?');">
