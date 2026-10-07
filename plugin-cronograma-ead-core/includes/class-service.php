@@ -171,6 +171,9 @@ class Cronograma_EAD_Service {
 
 	public static function bootstrap() {
 		$perfil = self::perfil();
+		if ( 'equipe' === $perfil ) {
+			self::sincronizar_feriados_automaticos();
+		}
 		$uids   = self::unidades_do_usuario();
 		$cat    = Cronograma_EAD_Store::get();
 		$data   = $cat['data'];
@@ -698,34 +701,97 @@ class Cronograma_EAD_Service {
 		$key = 'cronograma_ead_feriados_br_' . $ano;
 		$cached = get_transient( $key );
 		if ( is_array( $cached ) ) {
-			return array( 'ano' => $ano, 'feriados' => $cached, 'cache' => true );
+			return array( 'ano' => $ano, 'feriados' => $cached, 'cache' => true, 'fonte' => 'cache' );
 		}
+
+		$out = array();
 		$url = 'https://brasilapi.com.br/api/feriados/v1/' . $ano;
 		$res = wp_safe_remote_get( $url, array( 'timeout' => 8, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
-		if ( is_wp_error( $res ) ) {
-			return self::erro( 'feriados_indisponiveis', 'Não foi possível consultar os feriados nacionais agora. Tente novamente mais tarde.', 503 );
-		}
-		$status = (int) wp_remote_retrieve_response_code( $res );
-		$body = json_decode( wp_remote_retrieve_body( $res ), true );
-		if ( 200 !== $status || ! is_array( $body ) ) {
-			return self::erro( 'feriados_indisponiveis', 'O serviço de feriados nacionais retornou uma resposta inválida.', 503 );
-		}
-		$out = array();
-		foreach ( $body as $item ) {
-			if ( ! is_array( $item ) ) {
-				continue;
+		if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
+			$body = json_decode( wp_remote_retrieve_body( $res ), true );
+			if ( is_array( $body ) ) {
+				foreach ( $body as $item ) {
+					if ( ! is_array( $item ) ) {
+						continue;
+					}
+					$data = isset( $item['date'] ) ? sanitize_text_field( (string) $item['date'] ) : '';
+					$nome = isset( $item['name'] ) ? sanitize_text_field( (string) $item['name'] ) : 'Feriado nacional';
+					if ( Cronograma_EAD_Rules::data_ok( $data ) ) {
+						$out[] = array( $data, $nome );
+					}
+				}
 			}
-			$data = isset( $item['date'] ) ? sanitize_text_field( (string) $item['date'] ) : '';
-			$nome = isset( $item['name'] ) ? sanitize_text_field( (string) $item['name'] ) : 'Feriado nacional';
-			if ( Cronograma_EAD_Rules::data_ok( $data ) ) {
+		}
+		$fonte = 'brasilapi';
+
+		// Fallback local: mantém o calendário funcional mesmo se o serviço externo estiver indisponível.
+		if ( ! $out ) {
+			$fixos = array(
+				'01-01' => 'Confraternização Universal',
+				'04-21' => 'Tiradentes',
+				'05-01' => 'Dia Mundial do Trabalho',
+				'09-07' => 'Independência do Brasil',
+				'10-12' => 'Nossa Senhora Aparecida',
+				'11-02' => 'Finados',
+				'11-15' => 'Proclamação da República',
+				'11-20' => 'Dia Nacional de Zumbi e da Consciência Negra',
+				'12-25' => 'Natal',
+			);
+			foreach ( $fixos as $md => $nome ) {
+				$out[] = array( sprintf( '%04d-%s', $ano, $md ), $nome );
+			}
+			// Datas móveis usadas no calendário educacional brasileiro.
+			$pascoa = new DateTimeImmutable( '@' . easter_date( $ano ) );
+			$pascoa = $pascoa->setTimezone( new DateTimeZone( 'UTC' ) );
+			foreach ( array(
+				-48 => 'Carnaval',
+				-47 => 'Carnaval',
+				-2  => 'Paixão de Cristo',
+				60  => 'Corpus Christi',
+			) as $dias => $nome ) {
+				$data = $pascoa->modify( ( $dias >= 0 ? '+' : '' ) . $dias . ' days' )->format( 'Y-m-d' );
 				$out[] = array( $data, $nome );
 			}
-		}
-		if ( ! $out ) {
-			return self::erro( 'feriados_indisponiveis', 'Nenhum feriado nacional foi retornado para o ano informado.', 503 );
+			usort( $out, function ( $a, $b ) { return strcmp( $a[0], $b[0] ); } );
+			$fonte = 'fallback-local';
 		}
 		set_transient( $key, $out, 30 * DAY_IN_SECONDS );
-		return array( 'ano' => $ano, 'feriados' => $out, 'cache' => false );
+		return array( 'ano' => $ano, 'feriados' => $out, 'cache' => false, 'fonte' => $fonte );
+	}
+
+	/** Sincroniza automaticamente o ano atual e o próximo no catálogo institucional. */
+	private static function sincronizar_feriados_automaticos() {
+		if ( get_transient( 'cronograma_ead_auto_feriados_ok' ) ) {
+			return;
+		}
+		$cat = Cronograma_EAD_Store::get();
+		$data = $cat['data'];
+		$existentes = array();
+		foreach ( $data['feriados'] as $f ) {
+			if ( is_array( $f ) && isset( $f[0] ) && ( ! isset( $f[2] ) || '' === $f[2] ) ) {
+				$existentes[ $f[0] ] = true;
+			}
+		}
+		$mudou = false;
+		$ano_atual = (int) gmdate( 'Y' );
+		foreach ( array( $ano_atual, $ano_atual + 1 ) as $ano ) {
+			$r = self::feriados_nacionais( $ano );
+			if ( is_wp_error( $r ) || empty( $r['feriados'] ) ) {
+				continue;
+			}
+			foreach ( $r['feriados'] as $h ) {
+				if ( ! isset( $existentes[ $h[0] ] ) ) {
+					$data['feriados'][] = array( $h[0], $h[1] );
+					$existentes[ $h[0] ] = true;
+					$mudou = true;
+				}
+			}
+		}
+		if ( $mudou ) {
+			usort( $data['feriados'], function ( $a, $b ) { return strcmp( $a[0], $b[0] ); } );
+			Cronograma_EAD_Store::save( $data, (int) $cat['rev'] );
+		}
+		set_transient( 'cronograma_ead_auto_feriados_ok', 1, 12 * HOUR_IN_SECONDS );
 	}
 
 	/** Cópia completa, versionada e verificável por checksum. */
@@ -859,7 +925,8 @@ class Cronograma_EAD_Service {
 		update_option( 'cronograma_ead_pre_import_backup', wp_json_encode( $pre_backup ), false );
 		update_option( 'cronograma_ead_pre_import_backup_at', gmdate( 'c' ), false );
 		Cronograma_EAD_DB::begin();
-		$saved = Cronograma_EAD_Store::save( $prep['catalogo'], (int) $body['rev'] );
+		$rev_restauracao = ! empty( $prep['fullRestore'] ) ? (int) $catalog_before['rev'] : (int) $body['rev'];
+		$saved = Cronograma_EAD_Store::save( $prep['catalogo'], $rev_restauracao );
 		if ( is_wp_error( $saved ) ) {
 			Cronograma_EAD_DB::rollback();
 			return $saved;
