@@ -13,6 +13,7 @@ import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
 import { compute, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, fimFaseIntensivaAprendizagem, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
 import { quando } from '@/lib/format'
+import { aplicarConfiguracaoTurma, MODELO_LABEL } from '@/lib/scheduleProfiles'
 import type { ExportEntrada } from '@/lib/export'
 import type { Encontro, ItemTurma } from '@/lib/types'
 import { Timeline } from './Timeline'
@@ -68,7 +69,8 @@ function CronogramaAberto() {
   }, [avs, turmaId, lerAvisos])
 
   const t = d.turmas.find(x => x.id === turmaId) || d.turmas[0]
-  const curso = t ? d.cursos.find(c => c.id === t.cursoId) : undefined
+  const cursoBase = t ? d.cursos.find(c => c.id === t.cursoId) : undefined
+  const curso = cursoBase ? aplicarConfiguracaoTurma(cursoBase, t) : undefined
   const G = useMemo(() => (t && curso ? compute(t, curso, d.feriados) : null), [t, curso, d.feriados])
   const avisos = useMemo(() => (t && G ? verificar(t, G, d.feriados) : []), [t, G, d.feriados])
   const ruins = useMemo(() => encontrosRuins(avisos), [avisos])
@@ -151,7 +153,7 @@ function CronogramaAberto() {
       <div className="flex flex-col gap-4">
         <NavCronograma turmaId={t.id} />
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0"><div className="kicker">Solicitação de turma</div><h1 className="text-2xl font-semibold">{t.nome || 'Turma sem nome'}</h1><p className="text-sm text-muted-foreground">Unidade {unidadeNome} · {curso.nome}</p></div>
+          <div className="min-w-0"><div className="kicker">Solicitação de turma</div><h1 className="text-2xl font-semibold">{t.nome || 'Turma sem nome'}</h1><p className="text-sm text-muted-foreground">Unidade {unidadeNome} · {curso.nome} · {MODELO_LABEL[curso.modeloCronograma || 'qualificacao']}</p></div>
         </div>
         <FluxoBar t={t} bloqueios={0} />
         <CursoPendente t={t} />
