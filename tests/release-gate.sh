@@ -5,7 +5,11 @@ cd "$ROOT"
 
 bash tests/php-syntax.sh
 php tests/unit-rules.php
+php tests/catalog-contract.php
 node tests/calendar-contract.mjs
+node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-profiles.mjs
+node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-multimodel.mjs
+node --experimental-strip-types --experimental-specifier-resolution=node tests/modelos-cronograma.mjs
 node tests/security-static.mjs
 
 command -v pnpm >/dev/null || { echo 'BLOQUEIO: pnpm não instalado.' >&2; exit 20; }

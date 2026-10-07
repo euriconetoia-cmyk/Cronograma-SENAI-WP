@@ -1,4 +1,4 @@
-import { cursoTemPres, temPres, compute, encontros, feriadosDaTurma, toN, toS, workday, type Row } from './schedule'
+import { cursoTemMomentos, cursoTemPres, temPres, compute, momentos, feriadosDaTurma, toN, toS, workday, type Row } from './schedule'
 import type { Curso, Feriado, Pessoa, Status, Turma, Unidade } from './types'
 import { T } from './texts'
 
@@ -34,8 +34,8 @@ const COLS: Col[] = [
   { chave: 'evento', titulo: 'Evento', grupo: 'prazos', nivel: 'item', largura: 10, tipo: 'texto', pdf: true },
   { chave: 'monitor', titulo: 'Monitor', grupo: 'equipe', nivel: 'item', largura: 20, tipo: 'texto', pdf: true },
   { chave: 'tutor', titulo: 'Tutor', grupo: 'equipe', nivel: 'item', largura: 20, tipo: 'texto', pdf: true },
-  { chave: 'n', titulo: 'Nº', grupo: 'encontros', nivel: 'enc', largura: 5, tipo: 'centro', pdf: true },
-  { chave: 'denc', titulo: 'Data do encontro', grupo: 'encontros', nivel: 'enc', largura: 11, tipo: 'data', pdf: true },
+  { chave: 'n', titulo: 'Momento', grupo: 'encontros', nivel: 'enc', largura: 5, tipo: 'centro', pdf: true },
+  { chave: 'denc', titulo: 'Data do momento', grupo: 'encontros', nivel: 'enc', largura: 11, tipo: 'data', pdf: true },
   { chave: 'hor', titulo: 'Horário', grupo: 'encontros', nivel: 'enc', largura: 17, tipo: 'texto', pdf: true },
   { chave: 'recdia', titulo: 'Dia da recuperação', grupo: 'encontros', nivel: 'item', largura: 13, tipo: 'texto', pdf: true },
   { chave: 'web', titulo: 'Webconferência de alinhamento', grupo: 'encontros', nivel: 'enc', largura: 17, tipo: 'data', pdf: true },
@@ -69,7 +69,7 @@ export function montarModelo(e: ExportEntrada): Modelo {
     linhas.push({ mod: m.nome, celulas: [], primeira: true, span: 1 })
     m.itens.forEach(it => {
       const r: Row = G.by[it.id], c = r.c, st = t.itens[it.id] || {}
-      const enc = encontros(t, r, curso)
+      const enc = momentos(t, r, curso)
       const n = Math.max(1, enc.length)
       for (let i = 0; i < n; i++) {
         const x = enc[i]
@@ -83,8 +83,8 @@ export function montarModelo(e: ExportEntrada): Modelo {
           if (temPres(it)) { set('coord', nome(st.coordId || t.coordId)); set('prof', nome(st.profId || t.profId)); set('amb', st.ambiente || t.ambiente) }
           set('scorm', st.scorm); set('apostila', st.apostila); set('aval', st.aval); set('pesq', st.pesq); set('media', st.media); set('idm', st.idm)
         }
-        if (temPres(it) || it.tipo === 'mat') set('n', it.tipo === 'uc' ? `${i + 1}º` : it.tipo === 'mat' ? 'R' : '-')
-        if ((it.tipo === 'uc' || it.tipo === 'intro') && !temPres(it)) { /* sem carga presencial: nada de encontro, data ou horário */ }
+        if (enc.length || it.tipo === 'mat') set('n', it.tipo === 'uc' && x ? `${enc.slice(0, i + 1).filter(a => a.tipo === x.tipo).length}º ${x.tipo === 'sincrono' ? 'Sínc.' : 'Pres.'}` : it.tipo === 'mat' ? 'R' : '-')
+        if ((it.tipo === 'uc' || it.tipo === 'intro') && !x) { /* sem momento configurado */ }
         else if (it.tipo === 'uc' || it.tipo === 'intro') {
           set('denc', dt(x?.d)); set('hor', x?.h || ''); set('webh', x?.w || '')
           set('web', x?.d ? dt(toS(toN(x.d) - R.webDias)) : null)
@@ -96,8 +96,9 @@ export function montarModelo(e: ExportEntrada): Modelo {
   })
   let colunas = COLS
   const semPres = !cursoTemPres(curso)
-  if (e.suporte === false || semPres) {
-    const keep = COLS.map(c => (e.suporte !== false || c.grupo !== 'suporte') && !(semPres && (c.grupo === 'encontros' || c.grupo === 'presencial')))
+  const semMomentos = !cursoTemMomentos(curso)
+  if (e.suporte === false || semPres || semMomentos) {
+    const keep = COLS.map(c => (e.suporte !== false || c.grupo !== 'suporte') && !(semMomentos && c.grupo === 'encontros') && !(semPres && c.grupo === 'presencial'))
     colunas = COLS.filter((_, i) => keep[i])
     linhas.forEach(l => { if (!l.mod) l.celulas = l.celulas.filter((_, i) => keep[i]) })
   }

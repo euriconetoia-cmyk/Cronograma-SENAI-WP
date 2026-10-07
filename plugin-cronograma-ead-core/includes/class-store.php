@@ -98,6 +98,37 @@ class Cronograma_EAD_Store {
 			if ( ! is_array( $c ) || empty( $c['id'] ) || ! self::valid_id( $c['id'] ) || ! isset( $c['modulos'] ) || ! is_array( $c['modulos'] ) ) {
 				return new WP_Error( 'cronograma_ead_invalido', 'Curso com estrutura inválida.', array( 'status' => 400 ) );
 			}
+			$modelos = array( 'tecnico', 'qualificacao', 'distribuicao_diaria', 'aprendizagem', 'personalizado' );
+			if ( isset( $c['modeloCronograma'] ) && '' !== $c['modeloCronograma'] && ! in_array( $c['modeloCronograma'], $modelos, true ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Modelo de cronograma inválido.', array( 'status' => 400 ) );
+			}
+			$cfg = isset( $c['configuracaoCronograma'] ) && is_array( $c['configuracaoCronograma'] ) ? $c['configuracaoCronograma'] : array();
+			foreach ( array( 'diasEstudoPermitidos' ) as $campo_dias ) {
+				if ( isset( $cfg[ $campo_dias ] ) && ! self::dias_semana_validos( $cfg[ $campo_dias ] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Dias permitidos inválidos no curso.', array( 'status' => 400 ) );
+				}
+			}
+			foreach ( array( 'presencial', 'sincrono' ) as $tipo_evento ) {
+				if ( isset( $cfg[ $tipo_evento ]['diasPermitidos'] ) && ! self::dias_semana_validos( $cfg[ $tipo_evento ]['diasPermitidos'] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Dias permitidos inválidos em ' . $tipo_evento . '.', array( 'status' => 400 ) );
+				}
+			}
+			foreach ( $c['modulos'] as $modulo ) {
+				if ( ! is_array( $modulo ) || empty( $modulo['id'] ) || ! self::valid_id( $modulo['id'] ) || ! isset( $modulo['itens'] ) || ! is_array( $modulo['itens'] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Módulo com estrutura inválida.', array( 'status' => 400 ) );
+				}
+				foreach ( $modulo['itens'] as $item ) {
+					if ( ! is_array( $item ) || empty( $item['id'] ) || ! self::valid_id( $item['id'] ) || ! isset( $item['tipo'] ) || ! in_array( $item['tipo'], array( 'intro', 'uc', 'rec', 'mat', 'pratica' ), true ) ) {
+						return new WP_Error( 'cronograma_ead_invalido', 'Etapa de curso inválida.', array( 'status' => 400 ) );
+					}
+					$item_cfg = isset( $item['configuracaoCronograma'] ) && is_array( $item['configuracaoCronograma'] ) ? $item['configuracaoCronograma'] : array();
+					foreach ( array( 'presencial', 'sincrono' ) as $tipo_evento ) {
+						if ( isset( $item_cfg[ $tipo_evento ]['diasPermitidos'] ) && ! self::dias_semana_validos( $item_cfg[ $tipo_evento ]['diasPermitidos'] ) ) {
+							return new WP_Error( 'cronograma_ead_invalido', 'Dias permitidos inválidos na etapa.', array( 'status' => 400 ) );
+						}
+					}
+				}
+			}
 		}
 		foreach ( array( 'pessoas', 'unidades' ) as $k ) {
 			foreach ( $out[ $k ] as $p ) {
@@ -166,7 +197,7 @@ class Cronograma_EAD_Store {
 		if ( count( $in_itens ) > 500 ) {
 			return new WP_Error( 'cronograma_ead_grande', 'Quantidade excessiva de etapas na turma.', array( 'status' => 413 ) );
 		}
-		$item_allowed = array( 'enc', 'rec', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'scorm', 'apostila', 'aval', 'pesq', 'media', 'idm' );
+		$item_allowed = array( 'enc', 'sin', 'eventos', 'rec', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'scorm', 'apostila', 'aval', 'pesq', 'media', 'idm' );
 		$item_limits = array( 'rec' => 2000, 'evento' => 190, 'monitorId' => 64, 'tutorId' => 64, 'coordId' => 64, 'profId' => 64, 'ambiente' => 190, 'scorm' => 190, 'apostila' => 190, 'aval' => 190, 'pesq' => 190, 'media' => 190, 'idm' => 190 );
 		foreach ( $in_itens as $id => $it ) {
 			$id = (string) $id;
@@ -188,24 +219,84 @@ class Cronograma_EAD_Store {
 					$clean_item[ $k ] = $v;
 				}
 			}
-			if ( isset( $it['enc'] ) ) {
-				if ( ! is_array( $it['enc'] ) || count( $it['enc'] ) > 40 ) {
-					return new WP_Error( 'cronograma_ead_grande', "Encontros em excesso na etapa $id.", array( 'status' => 413 ) );
+			foreach ( array( 'enc' => 'Encontros', 'sin' => 'Momentos síncronos' ) as $campo_momento => $rotulo_momento ) {
+				if ( ! isset( $it[ $campo_momento ] ) ) {
+					continue;
 				}
-				foreach ( $it['enc'] as $enc ) {
-					if ( ! is_array( $enc ) ) {
-						return new WP_Error( 'cronograma_ead_invalido', "Encontro inválido na etapa $id.", array( 'status' => 400 ) );
+				if ( ! is_array( $it[ $campo_momento ] ) || count( $it[ $campo_momento ] ) > 40 ) {
+					return new WP_Error( 'cronograma_ead_grande', "$rotulo_momento em excesso na etapa $id.", array( 'status' => 413 ) );
+				}
+				foreach ( $it[ $campo_momento ] as $momento ) {
+					if ( ! is_array( $momento ) ) {
+						return new WP_Error( 'cronograma_ead_invalido', "Momento inválido na etapa $id.", array( 'status' => 400 ) );
 					}
-					$d = isset( $enc['d'] ) ? sanitize_text_field( (string) $enc['d'] ) : '';
+					$d = isset( $momento['d'] ) ? sanitize_text_field( (string) $momento['d'] ) : '';
 					if ( '' !== $d && ! Cronograma_EAD_Rules::data_ok( $d ) ) {
-						return new WP_Error( 'cronograma_ead_invalido', "Data de encontro inválida na etapa $id.", array( 'status' => 400 ) );
+						return new WP_Error( 'cronograma_ead_invalido', "Data de momento inválida na etapa $id.", array( 'status' => 400 ) );
 					}
 				}
-				$clean_item['enc'] = Cronograma_EAD_Rules::limpar_enc( $it['enc'] );
+				$clean_item[ $campo_momento ] = Cronograma_EAD_Rules::limpar_enc( $it[ $campo_momento ] );
+			}
+			if ( isset( $it['eventos'] ) ) {
+				if ( ! is_array( $it['eventos'] ) || count( $it['eventos'] ) > 100 ) {
+					return new WP_Error( 'cronograma_ead_grande', "Eventos pedagógicos em excesso na etapa $id.", array( 'status' => 413 ) );
+				}
+				$tipos_evento = array( 'estudo_ava', 'sincrono', 'presencial', 'web_aula', 'atendimento', 'atividade', 'recuperacao', 'pratica_empresa', 'matricula', 'postagem_notas', 'inicio_curso', 'fim_curso', 'inicio_modulo', 'fim_modulo' );
+				$eventos_limpos = array();
+				foreach ( $it['eventos'] as $evento ) {
+					if ( ! is_array( $evento ) ) {
+						return new WP_Error( 'cronograma_ead_invalido', "Evento pedagógico inválido na etapa $id.", array( 'status' => 400 ) );
+					}
+					$tipo = isset( $evento['tipo'] ) ? sanitize_text_field( (string) $evento['tipo'] ) : '';
+					if ( ! in_array( $tipo, $tipos_evento, true ) ) {
+						return new WP_Error( 'cronograma_ead_invalido', "Tipo de evento pedagógico inválido na etapa $id.", array( 'status' => 400 ) );
+					}
+					$ev = array( 'tipo' => $tipo );
+					foreach ( array( 'd', 'fim' ) as $campo_data ) {
+						if ( isset( $evento[ $campo_data ] ) && '' !== (string) $evento[ $campo_data ] ) {
+							$data_evento = sanitize_text_field( (string) $evento[ $campo_data ] );
+							if ( ! Cronograma_EAD_Rules::data_ok( $data_evento ) ) {
+								return new WP_Error( 'cronograma_ead_invalido', "Data de evento pedagógico inválida na etapa $id.", array( 'status' => 400 ) );
+							}
+							$ev[ $campo_data ] = $data_evento;
+						}
+					}
+					foreach ( array( 'id', 'h', 'titulo', 'observacao' ) as $campo_texto ) {
+						if ( isset( $evento[ $campo_texto ] ) ) {
+							$ev[ $campo_texto ] = sanitize_text_field( (string) $evento[ $campo_texto ] );
+						}
+					}
+					if ( isset( $evento['duracaoHoras'] ) ) {
+						$duracao = (float) $evento['duracaoHoras'];
+						if ( $duracao < 0 || $duracao > 24 ) {
+							return new WP_Error( 'cronograma_ead_invalido', "Duração de evento pedagógico inválida na etapa $id.", array( 'status' => 400 ) );
+						}
+						$ev['duracaoHoras'] = $duracao;
+					}
+					$eventos_limpos[] = $ev;
+				}
+				$clean_item['eventos'] = $eventos_limpos;
 			}
 			$t['itens'][ $id ] = $clean_item;
 		}
 		return $t;
+	}
+
+	/** Valida dias da semana no padrão JS/PHP: 0=domingo até 6=sábado. */
+	private static function dias_semana_validos( $dias ) {
+		if ( ! is_array( $dias ) ) {
+			return false;
+		}
+		foreach ( $dias as $dia ) {
+			if ( ! is_int( $dia ) && ! ctype_digit( (string) $dia ) ) {
+				return false;
+			}
+			$dia = (int) $dia;
+			if ( $dia < 0 || $dia > 6 ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	public static function valid_id( $id ) {

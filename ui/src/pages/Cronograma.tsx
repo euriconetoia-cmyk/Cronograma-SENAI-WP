@@ -11,7 +11,7 @@ import { abaPedida, pedidoAberto } from '@/lib/avisos'
 import { root } from '@/lib/root'
 import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
-import { compute, corrigirEncontros, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, planejarEncontros, fmtShort, feriadosDaTurma, situacao, toN, toS, todayStr, verificar, workday, type Row, type Situacao } from '@/lib/schedule'
+import { compute, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
 import { quando } from '@/lib/format'
 import type { ExportEntrada } from '@/lib/export'
 import type { Encontro, ItemTurma } from '@/lib/types'
@@ -23,7 +23,7 @@ const GRUPOS: Grupo[] = ['equipe', 'encontros', 'presencial', 'suporte']
 const SIT_STYLE: Record<Situacao, string> = {
   concluida: 'text-ok', andamento: 'text-primary font-semibold', aIniciar: 'text-muted-foreground', semData: 'text-warn',
 }
-const ROW_BG: Record<string, string> = { intro: 'bg-row-intro', mat: 'bg-row-intro', rec: 'bg-row-rec', uc: 'bg-card' }
+const ROW_BG: Record<string, string> = { intro: 'bg-row-intro', mat: 'bg-row-intro', rec: 'bg-row-rec', uc: 'bg-card', pratica: 'bg-row-intro' }
 
 /** Barra de navegação do cronograma aberto: volta à lista e troca de turma sem sair daqui. */
 function NavCronograma({ turmaId }: { turmaId: string }) {
@@ -79,11 +79,16 @@ function CronogramaAberto() {
   useEffect(() => {
     if (!podeCalcular || !t || !G || !t.inicio) return
     const plano = planejarEncontros(t, G, d.feriados, true)
-    if (Object.keys(plano).length) update(x => { const tt = x.turmas.find(a => a.id === t.id); if (!tt) return; for (const [id, enc] of Object.entries(plano)) tt.itens[id] = { ...(tt.itens[id] || {}), enc } })
+    const sincronos = planejarSincronicos(t, G, d.feriados, true)
+    if (Object.keys(plano).length || Object.keys(sincronos).length) update(x => {
+      const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
+      for (const [id, enc] of Object.entries(plano)) tt.itens[id] = { ...(tt.itens[id] || {}), enc }
+      for (const [id, sin] of Object.entries(sincronos)) tt.itens[id] = { ...(tt.itens[id] || {}), sin }
+    })
   }, [podeCalcular, t?.id, t?.inicio, G, d.feriados]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ao mudar o início, as datas dos encontros são recalculadas junto (as digitadas antes deixam de valer).
-  const mudarInicio = (v: string) => update(x => { const tt = x.turmas.find(a => a.id === t!.id); if (!tt) return; tt.inicio = v; for (const k of Object.keys(tt.itens)) if (tt.itens[k]?.enc) delete tt.itens[k].enc })
+  const mudarInicio = (v: string) => update(x => { const tt = x.turmas.find(a => a.id === t!.id); if (!tt) return; tt.inicio = v; for (const k of Object.keys(tt.itens)) { if (tt.itens[k]?.enc) delete tt.itens[k].enc; if (tt.itens[k]?.sin) delete tt.itens[k].sin } })
 
   if (!t) return <Empty titulo={T.cron.semTurma.titulo} texto={T.cron.semTurma.texto} acao={T.cron.semTurma.acao} onAcao={() => go('turmas')} />
   // Solicitação de um curso ainda não cadastrado: só há o pedido; a Unidigit@l cadastra o curso antes de iniciar.
@@ -107,8 +112,9 @@ function CronogramaAberto() {
   const unidadeNome = d.unidades.find(u => u.id === t.unidadeId)?.nome || '—'
   const lAj = lock(t, 'ajuste'), lEq = lock(t, 'equipe')
   const comPres = cursoTemPres(curso)
-  const gruposVis = GRUPOS.filter(g => (g !== 'suporte' || me.perfil === 'equipe') && (comPres || (g !== 'encontros' && g !== 'presencial')))
-  const gv = { ...grupos, encontros: grupos.encontros && comPres, presencial: grupos.presencial && comPres }
+  const comMomentos = cursoTemMomentos(curso)
+  const gruposVis = GRUPOS.filter(g => (g !== 'suporte' || me.perfil === 'equipe') && (g !== 'encontros' || comMomentos) && (g !== 'presencial' || comPres))
+  const gv = { ...grupos, encontros: grupos.encontros && comMomentos, presencial: grupos.presencial && comPres }
   const nBad = avisos.filter(a => a.nivel === 'bad').length
   const validacaoTxt = t.status === 'validado' && t.vigente ? `Validado por ${t.vigente.por} em ${quando(t.vigente.em).slice(0, 10)} (versão ${t.vigente.versao})${t.vigente.ressalva ? ` · Ressalva: ${t.vigente.ressalva}` : ''}`
     : t.vigente ? `Versão vigente: ${t.vigente.versao}, validada por ${t.vigente.por} em ${quando(t.vigente.em).slice(0, 10)}` : undefined
@@ -119,6 +125,18 @@ function CronogramaAberto() {
     const enc = encontros(t, r, curso).map(e => ({ ...e }))
     enc[i] = { ...enc[i], ...patch }
     setItem(r.it.id, { enc })
+  }
+  const setSin = (r: Row, i: number, patch: Partial<Encontro>) => {
+    const sin = sincronicos(t, r, curso).map(e => ({ ...e }))
+    sin[i] = { ...sin[i], ...patch }
+    setItem(r.it.id, { sin })
+  }
+  const setMomento = (r: Row, lista: MomentoInstrucional[], i: number, patch: Partial<Encontro>) => {
+    const atual = lista[i]
+    if (!atual) return
+    const tipoIx = lista.slice(0, i + 1).filter(x => x.tipo === atual.tipo).length - 1
+    if (atual.tipo === 'sincrono') setSin(r, tipoIx, patch)
+    else setEnc(r, tipoIx, patch)
   }
   const R = curso.regras
   // Datas com problema: corrige automaticamente (todas ou só uma) e leva o olhar até a data na tabela.
@@ -150,7 +168,7 @@ function CronogramaAberto() {
   }
   const problemas = avisos.filter(a => a.nivel !== 'ok')
   const emAndamento = G.rows.find(r => r.it.tipo !== 'rec' && situacao(r, hoje) === 'andamento')
-  const nEnc = G.rows.reduce((n, r) => n + (r.it.tipo === 'uc' ? encontros(t, r, curso).length : 0), 0)
+  const nEnc = G.rows.reduce((n, r) => n + (r.it.tipo === 'uc' ? momentos(t, r, curso).length : 0), 0)
   const inicio = G.rows[0]?.c.J || t.inicio
   const semUCs = G.rows.length === 0
   const fimTxt = t.fimManual ? fmt(t.fimManual) : G.end ? fmt(G.end) : ''
@@ -267,7 +285,7 @@ function CronogramaAberto() {
       <div className="flex flex-wrap gap-x-6 gap-y-1 rounded-lg border bg-card px-4 py-2.5 text-sm">
         {[
           [T.cron.resumo.ch, `${G.sumUC} h de ${curso.chTotal} h`],
-          ...(comPres ? [[T.cron.resumo.enc, String(nEnc)]] : []),
+          ...(comMomentos ? [[T.cron.resumo.enc, String(nEnc)]] : []),
           [T.cron.resumo.hoje, emAndamento ? emAndamento.it.nome : T.cron.resumo.nenhuma],
         ].map(([k, v]) => <span key={k}><span className="text-muted-foreground">{k}: </span><b className="font-semibold">{v}</b></span>)}
       </div>
@@ -306,7 +324,7 @@ function CronogramaAberto() {
       )}
 
       {visao === 'linha' ? <Timeline G={G} t={t} curso={curso} modulo={modulo} hoje={hoje} /> : (<>
-        <div className="md:hidden"><CartoesEtapas G={G} t={t} curso={curso} modulo={modulo} hoje={hoje} ruins={ruins} travado={lAj} setEnc={setEnc} /></div>
+        <div className="md:hidden"><CartoesEtapas G={G} t={t} curso={curso} modulo={modulo} hoje={hoje} ruins={ruins} travado={lAj} setMomento={setMomento} /></div>
         <div className="hidden max-h-[75vh] overflow-auto rounded-lg border bg-card md:block">
           <table className="min-w-max border-separate border-spacing-0 text-[13px]">
             <thead>
@@ -321,7 +339,7 @@ function CronogramaAberto() {
                 <th className={`${th} left-0 top-7 z-30 min-w-[280px]`}>Unidade curricular</th>
                 {['CH total', 'CH pres.', 'CH dist.', 'Dias de estudo EaD', 'Início', 'Término', 'Término AVA', 'Evento'].map(h => <th key={h} className={`${th} top-7`}>{h}</th>)}
                 {gv.equipe && ['Monitor', 'Tutor'].map(h => <th key={h} className={`${th} top-7`}>{h}</th>)}
-                {gv.encontros && ['Nº', 'Data do encontro', 'Horário', 'Dia da recuperação', 'Webconferência de alinhamento', 'Hora', 'Postagem das notas'].map(h => <th key={h} className={`${th} top-7`}>{h}</th>)}
+                {gv.encontros && ['Momento', 'Data', 'Horário', 'Dia da recuperação', 'Webconferência de alinhamento', 'Hora', 'Postagem das notas'].map(h => <th key={h} className={`${th} top-7`}>{h}</th>)}
                 {gv.presencial && ['Coordenador técnico', 'Professor presencial', 'Ambiente'].map(h => <th key={h} className={`${th} top-7`}>{h}</th>)}
                 {colsSup > 0 && ['SCORM', 'Apostila', 'Avaliação', 'Pesquisa', 'Média do SCORM', 'ID Moodle'].map(h => <th key={h} className={`${th} top-7`}>{h}</th>)}
               </tr>
@@ -331,13 +349,14 @@ function CronogramaAberto() {
                 <Fragment key={m.id}>
                   <tr><td colSpan={ncol} className="sticky left-0 border-b bg-row-mod px-3 py-1.5 font-heading text-xs font-semibold uppercase tracking-[.08em]">{m.nome}</td></tr>
                   {m.itens.map(it => {
-                    const r = G.by[it.id], c = r.c, st = t.itens[it.id] || {}, enc = encontros(t, r, curso), span = Math.max(1, enc.length)
+                    const r = G.by[it.id], c = r.c, st = t.itens[it.id] || {}, mom = momentos(t, r, curso), span = Math.max(1, mom.length)
                     const sit = situacao(r, hoje)
                     const bg = sit === 'andamento' ? 'bg-row-today' : ROW_BG[it.tipo]
                     const rs = { rowSpan: span }
                     return Array.from({ length: span }).map((_, i) => {
-                      const e = enc[i] ?? { d: '', h: R.horario, w: R.webHora }, semEnc = !enc[i]
-                      const ruim = it.tipo === 'uc' && ruins.has(`${it.id}:${i}`)
+                      const e = mom[i] ?? ({ d: '', h: R.horario, w: R.webHora, tipo: 'presencial' } as MomentoInstrucional), semEnc = !mom[i]
+                      const tipoIx = mom.slice(0, i + 1).filter(x => x.tipo === e.tipo).length
+                      const ruim = e.tipo === 'presencial' && it.tipo === 'uc' && ruins.has(`${it.id}:${tipoIx - 1}`)
                       return (
                         <tr key={`${it.id}-${i}`}>
                           {i === 0 && (
@@ -359,16 +378,16 @@ function CronogramaAberto() {
                               )}
                             </>
                           )}
-                          {gv.encontros && (!temPres(it) ? (i === 0 ? <td colSpan={7} {...rs} className={`border-b border-r ${bg}`} /> : null) : (it.tipo === 'uc' || it.tipo === 'intro' ? (
+                          {gv.encontros && (mom.length === 0 ? (i === 0 ? <td colSpan={7} {...rs} className={`border-b border-r ${bg}`} /> : null) : (it.tipo === 'uc' || it.tipo === 'intro' ? (
                             <>
-                              <td className={`mono border-b border-r px-2 text-center ${bg}`}>{it.tipo === 'uc' ? `${i + 1}º` : ''}</td>
+                              <td className={`whitespace-nowrap border-b border-r px-2 text-center ${bg}`}>{it.tipo === 'uc' ? `${tipoIx}º ${e.tipo === 'sincrono' ? 'Sínc.' : 'Pres.'}` : ''}</td>
                               <td className={`border-b border-r px-1 ${bg} ${ruim ? '!bg-bad-soft' : ''}`}>
-                                {it.tipo === 'intro' ? <span className="mono whitespace-nowrap px-1.5">{fmt(e.d)}</span> : <input type="date" disabled={lAj || semEnc} className={`cell-input mono w-[138px] ${ruim ? '!font-bold !text-destructive ring-2 ring-destructive' : ''}`} title={semEnc ? 'Esta unidade não tem carga presencial (CH pres. = 0), então não há encontros.' : ruim ? 'Esta data precisa de correção. Veja em Verificações.' : undefined} aria-invalid={ruim || undefined} value={e.d} onChange={ev => setEnc(r, i, { d: ev.target.value })} aria-label={`Data do ${i + 1}º encontro de ${it.nome}`} />}
+                                {it.tipo === 'intro' ? <span className="mono whitespace-nowrap px-1.5">{fmt(e.d)}</span> : <input type="date" disabled={lAj || semEnc} className={`cell-input mono w-[138px] ${ruim ? '!font-bold !text-destructive ring-2 ring-destructive' : ''}`} title={semEnc ? 'Não há momento configurado para esta linha.' : ruim ? 'Esta data precisa de correção. Veja em Verificações.' : undefined} aria-invalid={ruim || undefined} value={e.d} onChange={ev => setMomento(r, mom, i, { d: ev.target.value })} aria-label={`Data do ${tipoIx}º ${e.tipo === 'sincrono' ? 'momento síncrono' : 'encontro presencial'} de ${it.nome}`} />}
                               </td>
-                              <td className={`border-b border-r ${bg}`}>{it.tipo === 'intro' ? <span className="whitespace-nowrap px-1.5">{e.h}</span> : <input disabled={lAj} className="cell-input min-w-[150px]" value={e.h} onChange={ev => setEnc(r, i, { h: ev.target.value })} />}</td>
+                              <td className={`border-b border-r ${bg}`}>{it.tipo === 'intro' ? <span className="whitespace-nowrap px-1.5">{e.h}</span> : <input disabled={lAj} className="cell-input min-w-[150px]" value={e.h} onChange={ev => setMomento(r, mom, i, { h: ev.target.value })} />}</td>
                               {i === 0 && <td {...rs} className={`border-b border-r ${bg}`}>{it.tipo === 'uc' && <input disabled={lEq} className="cell-input w-24" value={st.rec ?? '-'} onChange={ev => setItem(it.id, { rec: ev.target.value })} />}</td>}
                               <td className={`mono whitespace-nowrap border-b border-r px-2 ${bg}`}>{e.d ? fmt(toS(toN(e.d) - R.webDias)) : ''}</td>
-                              <td className={`border-b border-r ${bg}`}>{it.tipo === 'intro' ? <span className="px-1.5">{e.w}</span> : <input disabled={lAj} className="cell-input mono w-16" value={e.w} onChange={ev => setEnc(r, i, { w: ev.target.value })} />}</td>
+                              <td className={`border-b border-r ${bg}`}>{it.tipo === 'intro' ? <span className="px-1.5">{e.w}</span> : <input disabled={lAj} className="cell-input mono w-16" value={e.w} onChange={ev => setMomento(r, mom, i, { w: ev.target.value })} />}</td>
                               <td className={`mono whitespace-nowrap border-b border-r px-2 ${bg}`}>{e.d ? fmt(workday(e.d, R.postDias, new Set(feriadosDaTurma(t, d.feriados).map(f => f[0])))) : ''}</td>
                             </>
                           ) : (

@@ -18,3 +18,10 @@ foreach ( $fx as $c ) {
 }
 
 echo 'OK unit-rules: ' . count( $fx ) . " calendar fixtures + date validation\n";
+
+$stored = array( 'id' => 't1', 'itens' => array( 'i1' => array( 'sin' => array() ) ) );
+$incoming = array( 'itens' => array( 'i1' => array( 'sin' => array( array( 'd' => '2026-04-20', 'h' => '19h', 'w' => '18h' ) ) ) ) );
+$merged = Cronograma_EAD_Rules::merge_unidade( $stored, $incoming, array( 'i1' ) );
+ok( isset( $merged['itens']['i1']['sin'][0]['d'] ) && '2026-04-20' === $merged['itens']['i1']['sin'][0]['d'], 'unit merge must preserve allowed synchronous moments' );
+
+echo "OK multimodel rules\n";

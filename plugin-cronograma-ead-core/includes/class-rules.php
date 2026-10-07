@@ -21,7 +21,7 @@ class Cronograma_EAD_Rules {
 
 	/** Campos que a unidade escolar pode ajustar, no nível da turma e no de cada etapa. */
 	const UNIT_TOP  = array( 'ambiente', 'profId', 'coordId' );
-	const UNIT_ITEM = array( 'enc', 'ambiente', 'profId', 'coordId' );
+	const UNIT_ITEM = array( 'enc', 'sin', 'ambiente', 'profId', 'coordId' );
 
 	/** Campos de metadados que nunca vêm do cliente. */
 	const META = array( 'status', 'versao', 'rev', 'prazo', 'vigente' );
@@ -147,7 +147,7 @@ class Cronograma_EAD_Rules {
 				if ( ! array_key_exists( $k, $it ) ) {
 					continue;
 				}
-				$out['itens'][ $id ][ $k ] = ( 'enc' === $k ) ? self::limpar_enc( $it[ $k ] ) : self::s( $it[ $k ] );
+				$out['itens'][ $id ][ $k ] = in_array( $k, array( 'enc', 'sin' ), true ) ? self::limpar_enc( $it[ $k ] ) : self::s( $it[ $k ] );
 			}
 		}
 		return $out;
@@ -201,7 +201,7 @@ class Cronograma_EAD_Rules {
 	/** Alguma data de encontro mudou? */
 	public static function mudou_data( array $changes ) {
 		foreach ( $changes as $c ) {
-			if ( preg_match( '/\.enc\.\d+\.d$/', $c['campo'] ) ) {
+			if ( preg_match( '/\.(?:enc|sin)\.\d+\.d$/', $c['campo'] ) ) {
 				return true;
 			}
 		}

@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.20.0-rc1 - Schedule Engine Multimodelo
+
+### Modelos de cronograma
+- Presets oficiais para Técnico, Qualificação, Distribuição Diária e Aprendizagem.
+- Perfil `personalizado` para combinações futuras sem criar outro motor.
+- Compatibilidade retroativa: cursos sem perfil explícito usam o comportamento legado de Qualificação.
+
+### Motor de cálculo
+- Distribuição Diária calcula os dias pela carga diária configurada.
+- Aprendizagem aceita momentos síncronos independentes da carga presencial.
+- Dias permitidos por tipo de evento substituem a suposição fixa de sábado.
+- Sugestões síncronas podem seguir sequência de dias permitidos; encontros presenciais mantêm distribuição compatível.
+- Prática profissional é uma etapa própria e compõe a carga total quando tiver CH informada.
+
+### Interface e exportação
+- Cadastro do curso recebe seletor de modelo, carga diária e regras de síncrono.
+- UC permite informar quantidade de momentos síncronos.
+- Aprendizagem permite adicionar Prática Profissional na Empresa.
+- Cronograma, cartões, linha do tempo e exportações reconhecem momentos presenciais e síncronos.
+
+### Contratos e testes
+- Backend aceita `sin` e eventos pedagógicos tipados, mantendo limites e datas válidas.
+- Regressão automatizada dos quatro modelos.
+- Novos testes de perfis, motor multimodelo e contrato do catálogo.
+
 ## 2.19.0 - Candidato de hardening
 
 ### Segurança

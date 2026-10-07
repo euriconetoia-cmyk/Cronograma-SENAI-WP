@@ -19,6 +19,11 @@ Pré-requisitos recomendados: Docker Compose, Node 22, pnpm 10, PHP 8.2 ou super
 3. Execute `bash tests/setup-wp.sh`. O comando imprime no final o JSON com IDs das páginas criado pelo plugin.
 4. Execute os testes E2E usando esse JSON conforme `docs/TESTING.md`.
 
+
+## Modelos de cronograma
+
+O motor suporta Técnico, Qualificação, Distribuição Diária e Aprendizagem, além de um perfil Personalizado. Consulte `docs/SCHEDULE-MODELS.md`. O modelo é separado da modalidade do curso e as regras podem ser sobrescritas por curso e UC.
+
 ## Frontend
 
 ```sh

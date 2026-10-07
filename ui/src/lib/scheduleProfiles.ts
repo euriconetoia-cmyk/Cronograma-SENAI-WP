@@ -1,0 +1,162 @@
+export type ModeloCronograma = 'tecnico' | 'qualificacao' | 'distribuicao_diaria' | 'aprendizagem' | 'personalizado'
+export type ModoQuantidadeEvento = 'carga' | 'quantidade' | 'manual'
+export type TipoEventoConfiguravel = 'presencial' | 'sincrono'
+
+export interface RegraEventoPerfil {
+  ativo: boolean
+  modo: ModoQuantidadeEvento
+  quantidade?: number
+  duracaoHoras?: number
+  diasPermitidos: number[]
+  horario?: string
+}
+
+export interface PerfilCronogramaResolvido {
+  modelo: ModeloCronograma
+  cargaDiaria?: number
+  diasEstudoPermitidos: number[]
+  presencial: RegraEventoPerfil
+  sincrono: RegraEventoPerfil
+  praticaProfissional: boolean
+}
+
+type EventoParcial = Partial<Omit<RegraEventoPerfil, 'diasPermitidos'>> & { diasPermitidos?: number[] }
+type ConfigParcial = {
+  cargaDiaria?: number
+  diasEstudoPermitidos?: number[]
+  presencial?: EventoParcial
+  sincrono?: EventoParcial
+  praticaProfissional?: boolean
+}
+type ItemLike = {
+  ch?: number
+  pres?: number
+  div?: number
+  sincronos?: number
+  configuracaoCronograma?: ConfigParcial
+}
+type CursoLike = {
+  modeloCronograma?: ModeloCronograma
+  configuracaoCronograma?: ConfigParcial
+  regras?: { hEncontro?: number; horario?: string }
+}
+
+const DIAS_UTEIS = [1, 2, 3, 4, 5]
+const SABADO = [6]
+
+const PRESETS: Record<Exclude<ModeloCronograma, 'personalizado'>, PerfilCronogramaResolvido> = {
+  tecnico: {
+    modelo: 'tecnico',
+    diasEstudoPermitidos: DIAS_UTEIS,
+    presencial: { ativo: true, modo: 'carga', duracaoHoras: 8, diasPermitidos: SABADO },
+    sincrono: { ativo: false, modo: 'quantidade', quantidade: 0, duracaoHoras: 2, diasPermitidos: DIAS_UTEIS },
+    praticaProfissional: false,
+  },
+  qualificacao: {
+    modelo: 'qualificacao',
+    diasEstudoPermitidos: DIAS_UTEIS,
+    presencial: { ativo: true, modo: 'carga', duracaoHoras: 8, diasPermitidos: SABADO },
+    sincrono: { ativo: false, modo: 'quantidade', quantidade: 0, duracaoHoras: 2, diasPermitidos: DIAS_UTEIS },
+    praticaProfissional: false,
+  },
+  distribuicao_diaria: {
+    modelo: 'distribuicao_diaria',
+    cargaDiaria: 3,
+    diasEstudoPermitidos: DIAS_UTEIS,
+    presencial: { ativo: false, modo: 'manual', quantidade: 0, duracaoHoras: 3, diasPermitidos: DIAS_UTEIS },
+    sincrono: { ativo: false, modo: 'manual', quantidade: 0, duracaoHoras: 2, diasPermitidos: DIAS_UTEIS },
+    praticaProfissional: false,
+  },
+  aprendizagem: {
+    modelo: 'aprendizagem',
+    diasEstudoPermitidos: DIAS_UTEIS,
+    presencial: { ativo: false, modo: 'carga', duracaoHoras: 8, diasPermitidos: SABADO },
+    sincrono: { ativo: true, modo: 'quantidade', quantidade: 0, duracaoHoras: 2, diasPermitidos: DIAS_UTEIS },
+    praticaProfissional: true,
+  },
+}
+
+const diasValidos = (dias: number[] | undefined, fallback: number[]) => {
+  const limpos = (dias || []).filter(d => Number.isInteger(d) && d >= 0 && d <= 6)
+  return limpos.length ? [...new Set(limpos)] : [...fallback]
+}
+
+const numeroPositivo = (v: unknown, fallback: number | undefined) => {
+  const n = Number(v)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+const mesclarEvento = (base: RegraEventoPerfil, override?: EventoParcial): RegraEventoPerfil => ({
+  ativo: override?.ativo ?? base.ativo,
+  modo: override?.modo ?? base.modo,
+  quantidade: override?.quantidade ?? base.quantidade,
+  duracaoHoras: numeroPositivo(override?.duracaoHoras, base.duracaoHoras),
+  diasPermitidos: diasValidos(override?.diasPermitidos, base.diasPermitidos),
+  horario: override?.horario ?? base.horario,
+})
+
+export function resolverPerfilCronograma(curso: CursoLike): PerfilCronogramaResolvido {
+  const modelo = curso.modeloCronograma || 'qualificacao'
+  const base = modelo === 'personalizado'
+    ? { ...PRESETS.qualificacao, modelo: 'personalizado' as const }
+    : PRESETS[modelo]
+  const cfg = curso.configuracaoCronograma || {}
+  const hEncontro = numeroPositivo(curso.regras?.hEncontro, base.presencial.duracaoHoras)
+  const presencialBase = { ...base.presencial, duracaoHoras: hEncontro, horario: curso.regras?.horario || base.presencial.horario }
+  return {
+    modelo,
+    cargaDiaria: numeroPositivo(cfg.cargaDiaria, base.cargaDiaria),
+    diasEstudoPermitidos: diasValidos(cfg.diasEstudoPermitidos, base.diasEstudoPermitidos),
+    presencial: mesclarEvento(presencialBase, cfg.presencial),
+    sincrono: mesclarEvento(base.sincrono, cfg.sincrono),
+    praticaProfissional: cfg.praticaProfissional ?? base.praticaProfissional,
+  }
+}
+
+export function resolverPerfilItem(item: ItemLike, curso: CursoLike): PerfilCronogramaResolvido {
+  const base = resolverPerfilCronograma(curso)
+  const cfg = item.configuracaoCronograma || {}
+  return {
+    ...base,
+    cargaDiaria: numeroPositivo(cfg.cargaDiaria, base.cargaDiaria),
+    diasEstudoPermitidos: diasValidos(cfg.diasEstudoPermitidos, base.diasEstudoPermitidos),
+    presencial: mesclarEvento(base.presencial, cfg.presencial),
+    sincrono: mesclarEvento(base.sincrono, cfg.sincrono),
+    praticaProfissional: cfg.praticaProfissional ?? base.praticaProfissional,
+  }
+}
+
+export function diasEstudoItem(item: ItemLike, curso: CursoLike): number {
+  const cargaEad = Math.max(0, Number(item.ch || 0) - Number(item.pres || 0))
+  if (cargaEad === 0) return 0
+  const perfil = resolverPerfilItem(item, curso)
+  if (perfil.modelo === 'distribuicao_diaria' && perfil.cargaDiaria) return Math.ceil(cargaEad / perfil.cargaDiaria)
+  if (cargaEad === 21) return 7
+  return Math.ceil(cargaEad / (numeroPositivo(item.div, 3) || 3))
+}
+
+export function quantidadeEventosItem(item: ItemLike, curso: CursoLike, tipo: TipoEventoConfiguravel): number {
+  const perfil = resolverPerfilItem(item, curso)
+  const regra = perfil[tipo]
+  if (!regra.ativo) return 0
+  const itemCfg = item.configuracaoCronograma?.[tipo]
+  if (itemCfg?.quantidade !== undefined) return Math.max(0, Math.floor(Number(itemCfg.quantidade || 0)))
+  if (tipo === 'sincrono' && Number.isFinite(Number(item.sincronos)) && Number(item.sincronos) >= 0 && item.sincronos !== undefined) {
+    return Math.floor(Number(item.sincronos))
+  }
+  if (regra.modo === 'quantidade') return Math.max(0, Math.floor(Number(regra.quantidade || 0)))
+  if (regra.modo === 'manual') return Math.max(0, Math.floor(Number(regra.quantidade || 0)))
+  const carga = Math.max(0, Number(item.pres || 0))
+  const duracao = numeroPositivo(regra.duracaoHoras, numeroPositivo(curso.regras?.hEncontro, 8)) || 8
+  return carga > 0 ? Math.ceil(carga / duracao) : 0
+}
+
+export function diasPermitidosEvento(item: ItemLike, curso: CursoLike, tipo: TipoEventoConfiguravel): number[] {
+  const perfil = resolverPerfilItem(item, curso)
+  return diasValidos(perfil[tipo].diasPermitidos, tipo === 'presencial' ? SABADO : DIAS_UTEIS)
+}
+
+export function duracaoEventoItem(item: ItemLike, curso: CursoLike, tipo: TipoEventoConfiguravel): number {
+  const perfil = resolverPerfilItem(item, curso)
+  return numeroPositivo(perfil[tipo].duracaoHoras, tipo === 'presencial' ? 8 : 2) || (tipo === 'presencial' ? 8 : 2)
+}

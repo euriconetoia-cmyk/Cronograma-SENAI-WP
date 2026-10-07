@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { encontros, fmtShort, situacao, toN, type Result } from '@/lib/schedule'
+import { momentos, fmtShort, situacao, toN, type Result } from '@/lib/schedule'
 import type { Curso, Turma } from '@/lib/types'
 
-const BAR: Record<string, string> = { intro: 'bg-ok', uc: 'bg-primary', rec: 'bg-warn', mat: 'bg-ok' }
+const BAR: Record<string, string> = { intro: 'bg-ok', uc: 'bg-primary', rec: 'bg-warn', mat: 'bg-ok', pratica: 'bg-brand' }
 const MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
 
 export function Timeline({ G, t, curso, modulo, hoje }: { G: Result; t: Turma; curso: Curso; modulo: string; hoje: string }) {
@@ -41,7 +41,7 @@ export function Timeline({ G, t, curso, modulo, hoje }: { G: Result; t: Turma; c
             <div className="sticky left-0 border-b bg-row-mod px-3 py-1 font-heading text-xs font-semibold uppercase tracking-[.08em]">{m.nome}</div>
             {m.itens.map(it => {
               const r = G.by[it.id]
-              const enc = encontros(t, r, curso).filter(e => e.d && it.tipo === 'uc')
+              const enc = momentos(t, r, curso).filter(e => e.d && it.tipo === 'uc')
               const sit = situacao(r, hoje)
               return (
                 <div key={it.id} className="flex border-b">
@@ -55,7 +55,7 @@ export function Timeline({ G, t, curso, modulo, hoje }: { G: Result; t: Turma; c
                         title={`${it.nome}: ${fmtShort(r.c.J)} a ${fmtShort(r.c.K)}`} />
                     )}
                     {enc.map((e, i) => (
-                      <div key={i} className="absolute top-[11px] z-[6] h-3 w-3 rotate-45 border-2 border-card bg-brand" style={{ left: `calc(${pct(toN(e.d))} - 6px)` }} title={`${i + 1}º encontro: ${fmtShort(e.d)}`} />
+                      <div key={i} className="absolute top-[11px] z-[6] h-3 w-3 rotate-45 border-2 border-card bg-brand" style={{ left: `calc(${pct(toN(e.d))} - 6px)` }} title={`${i + 1}º ${e.tipo === 'sincrono' ? 'momento síncrono' : 'encontro presencial'}: ${fmtShort(e.d)}`} />
                     ))}
                   </div>
                 </div>
@@ -68,7 +68,7 @@ export function Timeline({ G, t, curso, modulo, hoje }: { G: Result; t: Turma; c
         <span><i className="mr-1.5 inline-block h-2.5 w-4 rounded-sm bg-primary align-middle" />Unidade curricular</span>
         <span><i className="mr-1.5 inline-block h-2.5 w-4 rounded-sm bg-warn align-middle" />Recuperação</span>
         <span><i className="mr-1.5 inline-block h-2.5 w-4 rounded-sm bg-ok align-middle" />Introdução e Matrícula</span>
-        <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rotate-45 bg-brand align-middle" />Encontro presencial</span>
+        <span><i className="mr-1.5 inline-block h-2.5 w-2.5 rotate-45 bg-brand align-middle" />Momento presencial ou síncrono</span>
         <span><i className="mr-1.5 inline-block h-3 w-px bg-destructive align-middle" />Hoje</span>
       </div>
     </div>

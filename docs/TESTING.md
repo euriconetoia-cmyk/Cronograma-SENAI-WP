@@ -39,3 +39,16 @@ Os E2E validam autenticação, isolamento entre unidades, restrições por perfi
 ## Política de regressão
 
 A suíte crítica inteira deve ser executada antes de cada merge. Nenhuma fase deixa de ser testada após sua aprovação.
+
+## Regressão multimodelo
+
+Executar:
+
+```sh
+php tests/catalog-contract.php
+node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-profiles.mjs
+node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-multimodel.mjs
+node --experimental-strip-types --experimental-specifier-resolution=node tests/modelos-cronograma.mjs
+```
+
+O último teste é o portão funcional dos quatro modelos oficiais: Técnico, Qualificação, Distribuição Diária e Aprendizagem.
