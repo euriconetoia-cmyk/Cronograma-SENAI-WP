@@ -209,6 +209,29 @@ class Cronograma_EAD_DB {
 		// O histórico e as versões ficam guardados de propósito.
 	}
 
+	public static function limpar_dados_teste() {
+		global $wpdb;
+		if ( ! self::begin() ) {
+			return new WP_Error( 'cronograma_ead_reset', 'Não foi possível iniciar a limpeza.', array( 'status' => 500 ) );
+		}
+		try {
+			foreach ( array( 'avisos', 'log', 'versoes', 'turmas' ) as $tabela ) {
+				$ok = $wpdb->query( 'DELETE FROM ' . self::t( $tabela ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+				if ( false === $ok ) {
+					throw new RuntimeException( 'Falha ao limpar a tabela ' . $tabela . '.' );
+				}
+			}
+			if ( ! self::commit() ) {
+				throw new RuntimeException( 'Falha ao confirmar a limpeza.' );
+			}
+			self::audit_admin( 'reset_dados_teste', 'sistema', '', 'ok', array( 'escopo' => array( 'cursos', 'turmas', 'versoes', 'historico', 'avisos' ) ) );
+			return true;
+		} catch ( Throwable $e ) {
+			self::rollback();
+			return new WP_Error( 'cronograma_ead_reset', $e->getMessage(), array( 'status' => 500 ) );
+		}
+	}
+
 	/* ---------- versões ---------- */
 
 	public static function salvar_versao( $turma_id, $versao, $snapshot, $user_id, $nome, $ressalva ) {
