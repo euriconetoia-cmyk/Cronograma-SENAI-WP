@@ -6,7 +6,7 @@ export class ApiError extends Error {
 }
 
 export interface AcaoBody { acao: AcaoNome; rev: number; motivo?: string; ressalva?: string; prazo?: string; tipo?: SubtipoPedido; atende?: boolean }
-export interface Copia { format?: string; formato?: string; schemaVersion?: number; backupMode?: 'full-state'; applicationVersion?: string; generatedAt?: string; siteId?: string; checksum?: string; catalogo: Catalogo; turmas: Turma[] }
+export interface Copia { format?: string; formato?: string; schemaVersion?: number; backupMode?: 'full-state'; checksumMode?: string; applicationVersion?: string; generatedAt?: string; siteId?: string; checksum?: string; catalogo: Catalogo; turmas: Turma[] }
 
 export interface Api {
   mock?: boolean
