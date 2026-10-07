@@ -72,6 +72,21 @@ class Cronograma_EAD_Store {
 		return array( 'rev' => $new );
 	}
 
+	/** Restaura exatamente um snapshot interno do catálogo após falha transacional. */
+	public static function restore_snapshot( $snapshot ) {
+		if ( ! is_array( $snapshot ) || ! isset( $snapshot['data'], $snapshot['rev'] ) || ! is_array( $snapshot['data'] ) ) {
+			return false;
+		}
+		$json = wp_json_encode( $snapshot['data'] );
+		if ( false === $json || strlen( $json ) > self::MAX_BYTES ) {
+			return false;
+		}
+		update_option( self::OPT_DATA, $json, false );
+		update_option( self::OPT_REV, (int) $snapshot['rev'], false );
+		delete_transient( 'cronograma_ead_lock' );
+		return true;
+	}
+
 	/** Valida a estrutura do catálogo e limpa todos os textos. */
 	public static function sanitize_payload( $input ) {
 		if ( is_object( $input ) ) {
