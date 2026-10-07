@@ -22,7 +22,7 @@ jobs:
       - name: Install PHP quality dependencies
         run: composer install --no-interaction --prefer-dist
       - name: PHPCS
-        run: composer phpcs
+        run: vendor/bin/phpcs -p -n
       - name: PHPStan
         run: composer phpstan
       - name: Execute full release gate
