@@ -94,6 +94,21 @@ class Cronograma_EAD_Store {
 			}
 			$out[ $k ] = array_values( self::clean( $input[ $k ] ) );
 		}
+		foreach ( $out['cursos'] as $i => $curso ) {
+			if ( isset( $curso['modalidade'] ) && 'presencial' === $curso['modalidade'] ) {
+				$out['cursos'][ $i ]['modalidade'] = 'semipresencial';
+			}
+			if ( isset( $out['cursos'][ $i ]['modalidade'] ) && '' !== $out['cursos'][ $i ]['modalidade'] && ! in_array( $out['cursos'][ $i ]['modalidade'], array( 'ead', 'semipresencial' ), true ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Modalidade inválida. Use EaD ou Semipresencial / Híbrido.', array( 'status' => 400 ) );
+			}
+		}
+		$ufs = array( 'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO' );
+		foreach ( $out['unidades'] as $unidade ) {
+			if ( isset( $unidade['estado'] ) && '' !== $unidade['estado'] && ! in_array( strtoupper( (string) $unidade['estado'] ), $ufs, true ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Estado inválido no cadastro da unidade.', array( 'status' => 400 ) );
+			}
+		}
+
 		foreach ( $out['cursos'] as $c ) {
 			if ( ! is_array( $c ) || empty( $c['id'] ) || ! self::valid_id( $c['id'] ) || ! isset( $c['modulos'] ) || ! is_array( $c['modulos'] ) ) {
 				return new WP_Error( 'cronograma_ead_invalido', 'Curso com estrutura inválida.', array( 'status' => 400 ) );
