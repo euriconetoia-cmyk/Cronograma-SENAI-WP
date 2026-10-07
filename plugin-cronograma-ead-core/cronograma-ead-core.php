@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Cronogramas EaD (Núcleo)
  * Description:       Cadastro de cursos, turmas, equipe e feriados que gera o cronograma EaD com prazos por dias úteis, com fluxo de validação pela unidade escolar, histórico, versões e exportação em Excel e PDF.
- * Version:           2.20.0-rc1
+ * Version:           2.21.0-rc1
  * Requires at least: 6.0
  * Requires PHP:      7.4
  * Author:            Unidigit@l
@@ -23,7 +23,7 @@ if ( defined( 'CRONOGRAMA_EAD_VERSION' ) ) {
 	return;
 }
 
-define( 'CRONOGRAMA_EAD_VERSION', '2.20.0-rc1' );
+define( 'CRONOGRAMA_EAD_VERSION', '2.21.0-rc1' );
 define( 'CRONOGRAMA_EAD_FILE', __FILE__ );
 define( 'CRONOGRAMA_EAD_DIR', plugin_dir_path( __FILE__ ) );
 define( 'CRONOGRAMA_EAD_URL', plugin_dir_url( __FILE__ ) );
