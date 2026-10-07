@@ -8,7 +8,7 @@ class Sess{ constructor(){this.c={}}
   async page(id){ let r=await this.req('/?page_id='+id); if([301,302,303,307,308].includes(r.status)){ const loc=r.headers.get('location'); if(loc){ const u=new URL(loc,B); r=await this.req(u.pathname+u.search) } } const t=await r.text(); const m=t.match(/CRONOGRAMA_EAD\s*=\s*(\{.*?\});/s); return {status:r.status,html:t,cfg:m?JSON.parse(m[1]):null} }
   async api(method,path,body,nonce){ const r=await this.req('/?rest_route=/cronograma-ead/v1/'+path,{method,headers:{'Content-Type':'application/json','X-WP-Nonce':nonce},body:body===undefined?undefined:JSON.stringify(body)}); let j=null; try{j=await r.json()}catch{} return {status:r.status,j} } }
 
-const pid=13; const U={}
+const ids=JSON.parse(process.argv[2]); const pid=ids.cronograma; const U={}
 for(const u of ['admin','coord_itb','aux_itb','coord_luz','consulta']){ const s=new Sess(); await s.login(u); const p=await s.page(pid); U[u]={s,n:p.cfg.nonce,perfil:p.cfg.perfil} }
 const api=(u,m,p,b)=>U[u].s.api(m,p,b,U[u].n)
 const b=await api('admin','GET','bootstrap'); const cursoId=b.j.turmas[0].cursoId
