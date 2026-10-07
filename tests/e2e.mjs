@@ -48,5 +48,21 @@ const atA=await U.admin.s.api('GET','atividade',undefined,U.admin.n); ok(atA.sta
   const b2=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n); ok(b2.j.catalogo.cursos[0].modalidade==='semipresencial'&&b2.j.catalogo.cursos[0].categoria==='qualificacao','modalidade do curso persistiu')
   const b3=await U.coord_itb.s.api('GET','bootstrap',undefined,U.coord_itb.n); ok(b3.j.catalogo.cursos.every(c=>c.modalidade!==undefined&&c.categoria!==undefined),'unidade também recebe a modalidade') }
 const ex=await U.admin.s.api('GET','exportar',undefined,U.admin.n); ok(ex.status===200&&ex.j.turmas.length>=2,'backup exporta')
+ok(ex.j?.schemaVersion===4&&ex.j?.backupMode==='full-state'&&typeof ex.j?.checksum==='string','backup usa formato completo v4')
 const exu=await U.coord_itb.s.api('GET','exportar',undefined,U.coord_itb.n); ok(exu.status===403,'unidade não exporta backup ('+exu.status+')')
+
+// restauração completa: cria um dado depois do backup, simula e volta exatamente ao estado salvo
+const EXTRA='t_pos_backup_'+Date.now()
+const extra=await U.admin.s.api('POST','turmas',{turma:{id:EXTRA,cursoId,unidadeId:'u_itb',nome:'Criada depois do backup',inicio:'2026-08-03',obs:'',evento:'',monitorId:'',tutorId:'',coordId:'',profId:'',ambiente:'',itens:{}}},U.admin.n)
+ok(extra.status===200||extra.status===201,'cria turma depois do backup ('+extra.status+')')
+const beforeRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+const sim=await U.admin.s.api('POST','importar',{...ex.j,simular:true},U.admin.n)
+ok(sim.status===200&&sim.j?.simulacao===true&&typeof sim.j?.confirmacao==='string','simula restauração completa ('+sim.status+')')
+const restored=await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev,confirmacao:sim.j.confirmacao,simular:false},U.admin.n)
+ok(restored.status===200,'restauração completa executa ('+restored.status+')')
+const afterRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+ok(!(afterRestore.j?.turmas||[]).some(x=>x.id===EXTRA),'restauração remove turma criada após o backup')
+const restoredFlow=(afterRestore.j?.turmas||[]).find(x=>x.id===ID)
+const backedFlow=(ex.j?.turmas||[]).find(x=>x.id===ID)
+ok(!!restoredFlow&&!!backedFlow&&restoredFlow.status===backedFlow.status&&restoredFlow.versao===backedFlow.versao,'restauração preserva status e versão da turma')
 console.log(fails?`\n${fails} FALHA(S)`:'\nTUDO OK')
