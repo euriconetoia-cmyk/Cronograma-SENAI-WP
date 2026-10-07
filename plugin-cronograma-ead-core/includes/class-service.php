@@ -869,7 +869,10 @@ class Cronograma_EAD_Service {
 			$url_mun = add_query_arg( 'ano', $ano, 'https://feriadosapi.com/api/v1/feriados/cidade/' . rawurlencode( $ibge ) );
 			$resm = wp_safe_remote_get( $url_mun, array( 'timeout' => 12, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json', 'X-API-Key' => $api_key ) ) );
 			if ( ! is_wp_error( $resm ) && 200 === (int) wp_remote_retrieve_response_code( $resm ) ) {
-				foreach ( (array) json_decode( wp_remote_retrieve_body( $resm ), true ) as $item ) {
+				$bodym = json_decode( wp_remote_retrieve_body( $resm ), true );
+				$lista_municipal = is_array( $bodym ) && isset( $bodym['feriados'] ) && is_array( $bodym['feriados'] ) ? $bodym['feriados'] : ( is_array( $bodym ) ? $bodym : array() );
+				foreach ( $lista_municipal as $item ) {
+					if ( ! is_array( $item ) ) continue;
 					$raw = isset( $item['data'] ) ? sanitize_text_field( (string) $item['data'] ) : '';
 					$data = $raw;
 					if ( preg_match( '/^(\d{2})\/(\d{2})\/(\d{4})$/', $raw, $m ) ) $data = $m[3] . '-' . $m[2] . '-' . $m[1];
