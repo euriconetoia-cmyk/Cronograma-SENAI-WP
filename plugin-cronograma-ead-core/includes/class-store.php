@@ -118,9 +118,23 @@ class Cronograma_EAD_Store {
 			}
 		}
 		$ufs = array( 'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO' );
-		foreach ( $out['unidades'] as $unidade ) {
-			if ( isset( $unidade['estado'] ) && '' !== $unidade['estado'] && ! in_array( strtoupper( (string) $unidade['estado'] ), $ufs, true ) ) {
+		foreach ( $out['unidades'] as $i => $unidade ) {
+			$estado = isset( $unidade['estado'] ) ? strtoupper( trim( (string) $unidade['estado'] ) ) : '';
+			$cidade = isset( $unidade['cidade'] ) ? trim( (string) $unidade['cidade'] ) : '';
+			if ( ! in_array( $estado, $ufs, true ) ) {
 				return new WP_Error( 'cronograma_ead_invalido', 'Estado inválido no cadastro da unidade.', array( 'status' => 400 ) );
+			}
+			if ( '' === $cidade ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Informe a cidade da unidade.', array( 'status' => 400 ) );
+			}
+			$out['unidades'][ $i ]['estado'] = $estado;
+			$out['unidades'][ $i ]['cidade'] = $cidade;
+			if ( isset( $unidade['codigoIbge'] ) && '' !== (string) $unidade['codigoIbge'] ) {
+				$ibge = preg_replace( '/\D+/', '', (string) $unidade['codigoIbge'] );
+				if ( ! preg_match( '/^\d{7}$/', $ibge ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Código IBGE inválido no cadastro da unidade.', array( 'status' => 400 ) );
+				}
+				$out['unidades'][ $i ]['codigoIbge'] = $ibge;
 			}
 		}
 
