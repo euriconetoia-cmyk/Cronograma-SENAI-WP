@@ -1,0 +1,29 @@
+name: Apply 2.20 patch
+on:
+  push:
+    branches:
+      - release/2.20.0-rc1
+    paths:
+      - '.bootstrap/2.20.patch'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply multimodel patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git apply --check .bootstrap/2.20.patch
+          git apply .bootstrap/2.20.patch
+          rm -rf .bootstrap
+          rm -f .github/workflows/apply-220-patch.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add Schedule Engine 2.0 multimodelo"
+          git push origin HEAD:release/2.20.0-rc1
