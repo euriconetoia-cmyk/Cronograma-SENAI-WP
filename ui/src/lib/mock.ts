@@ -82,6 +82,20 @@ export const mockApi: Api = {
     const { rotulo: _r, ...m } = me(); void _r
     return { me: m, catalogo: cat, crev: S.crev, turmas } satisfies Boot
   },
+  async feriadosNacionais(ano) {
+    const fixos: [string, string][] = [
+      [`${ano}-01-01`, 'Confraternização Universal'],
+      [`${ano}-04-21`, 'Tiradentes'],
+      [`${ano}-05-01`, 'Dia Mundial do Trabalho'],
+      [`${ano}-09-07`, 'Independência do Brasil'],
+      [`${ano}-10-12`, 'Nossa Senhora Aparecida'],
+      [`${ano}-11-02`, 'Finados'],
+      [`${ano}-11-15`, 'Proclamação da República'],
+      [`${ano}-11-20`, 'Dia Nacional de Zumbi e da Consciência Negra'],
+      [`${ano}-12-25`, 'Natal'],
+    ]
+    return { ano, feriados: fixos, cache: true }
+  },
   async saveCatalogo(data, rev) {
     if (me().perfil !== 'equipe') throw new ApiError(403, 'sem_permissao', 'Seu perfil não pode alterar o cadastro.')
     if (rev !== S.crev) throw new ApiError(409, 'conflito', 'Os dados foram alterados por outra pessoa.')
