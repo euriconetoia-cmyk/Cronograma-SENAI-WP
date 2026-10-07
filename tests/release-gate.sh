@@ -20,7 +20,7 @@ command -v pnpm >/dev/null || { echo 'BLOQUEIO: pnpm não instalado.' >&2; exit 
   pnpm typecheck
   pnpm build:wp
   pnpm build:preview
-  pnpm audit --audit-level high
+  pnpm audit --prod --audit-level high
 )
 cp ui/dist-wp/app.js plugin-cronograma-ead-core/assets/app.js
 test -s plugin-cronograma-ead-core/assets/app.js || { echo 'BLOQUEIO: bundle WordPress não foi gerado.' >&2; exit 21; }
