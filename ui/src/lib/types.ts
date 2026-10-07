@@ -17,7 +17,7 @@ export type Modalidade = 'ead' | 'semipresencial'
 export type Categoria = 'iniciacao' | 'aprendizagem_basica' | 'qualificacao' | 'aperfeicoamento' | 'especializacao_prof' | 'aprendizagem_tecnica' | 'tecnico' | 'curso_livre' | 'graduacao_tecnologica' | 'graduacao' | 'pos_graduacao' | 'mestrado_doutorado'
 export interface Curso { id: string; nome: string; categoria?: Categoria | ''; modalidade?: Modalidade | ''; modeloCronograma?: ModeloCronograma; configuracaoCronograma?: ConfiguracaoCronograma; chTotal: number; nota: string; regras: Regras; modulos: Modulo[]; resumo?: boolean }
 export interface Pessoa { id: string; nome: string; papel: Papel }
-export interface Unidade { id: string; nome: string; cidade?: string; estado?: string }
+export interface Unidade { id: string; nome: string; cidade?: string; estado: string }
 export interface Encontro { d: string; h: string; w: string }
 export interface EventoPedagogico { id?: string; tipo: TipoEventoPedagogico; d: string; fim?: string; h?: string; duracaoHoras?: number; titulo?: string; observacao?: string }
 export interface ItemTurma {
