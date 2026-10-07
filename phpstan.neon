@@ -1,0 +1,12 @@
+parameters:
+  level: 4
+  paths:
+    - plugin-cronograma-ead-core/includes
+  excludePaths:
+    analyse:
+      - plugin-cronograma-ead-core/assets
+  scanFiles:
+    - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+  bootstrapFiles:
+    - tests/phpstan-bootstrap.php
+  treatPhpDocTypesAsCertain: false

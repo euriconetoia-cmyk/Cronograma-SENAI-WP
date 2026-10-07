@@ -1,0 +1,64 @@
+/*
+Theme Name: Cronogramas EaD
+Description: Tema para o sistema de cronogramas EaD da Unidigit@l. Layout em largura total para as telas do sistema, menu com as páginas do plugin Cronogramas EaD (Núcleo), modo claro e escuro.
+Version: 1.3.0
+Requires at least: 6.0
+Requires PHP: 7.4
+Author: Unidigit@l
+License: GPL-2.0-or-later
+Text Domain: cronograma-ead-tema
+*/
+
+:root{
+  --ct-bg:#f3f5f8; --ct-surface:#ffffff; --ct-fg:#16202e; --ct-muted:#5b6778; --ct-line:#d3dae4;
+  --ct-accent:#0b4f9c; --ct-accent-fg:#ffffff; --ct-head:#0d2a52; --ct-head-fg:#ffffff;
+  --ct-font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --ct-font-head:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --ct-bg:#0f151e; --ct-surface:#171f2b; --ct-fg:#e6ebf2; --ct-muted:#9aa7b8; --ct-line:#2d3a4b;
+  --ct-accent:#6aa8f0; --ct-accent-fg:#0b1420; --ct-head:#0b1a30; --ct-head-fg:#e6ebf2; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --ct-bg:#0f151e; --ct-surface:#171f2b; --ct-fg:#e6ebf2; --ct-muted:#9aa7b8; --ct-line:#2d3a4b;
+  --ct-accent:#6aa8f0; --ct-accent-fg:#0b1420; --ct-head:#0b1a30; --ct-head-fg:#e6ebf2; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ct-bg);color:var(--ct-fg);font-family:var(--ct-font);font-size:15px;line-height:1.55}
+a{color:var(--ct-accent)}
+.ct-skip{position:absolute;left:-999px;top:0;background:var(--ct-accent);color:var(--ct-accent-fg);padding:8px 12px;z-index:100}
+.ct-skip:focus{left:8px;top:8px}
+
+/* Cabeçalho */
+.ct-header{background:var(--ct-head);color:var(--ct-head-fg)}
+.ct-header-in{max-width:1500px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center;justify-content:space-between}
+.ct-brand{font-family:var(--ct-font-head);font-weight:600;font-size:20px;letter-spacing:.02em;color:inherit;text-decoration:none}
+.ct-brand{display:inline-flex;align-items:center;gap:14px}
+.ct-logo{height:30px;width:auto;display:block}
+.ct-brand-txt{padding-left:14px;border-left:1px solid rgba(255,255,255,.35)}
+.ct-brand small{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:500;opacity:.75}
+.ct-nav{display:flex;flex-wrap:wrap;gap:2px;list-style:none;margin:0;padding:0}
+.ct-nav a{display:block;padding:7px 12px;border-radius:6px;color:inherit;text-decoration:none;font-weight:500}
+.ct-nav a:hover{background:rgba(255,255,255,.12)}
+.ct-nav .current-menu-item > a,.ct-nav .current_page_item > a,.ct-nav .current-page-ancestor > a{background:rgba(255,255,255,.2)}
+.ct-user{display:flex;gap:10px;align-items:center;font-size:13px}
+.ct-user a{color:inherit}
+.ct-toggle{background:transparent;border:1px solid rgba(255,255,255,.4);color:inherit;border-radius:6px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}
+.ct-toggle:focus-visible,.ct-nav a:focus-visible,.ct-user a:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+/* Conteúdo */
+.ct-main{max-width:1500px;margin:0 auto;padding:20px 16px 48px}
+.ct-main.ct-narrow{max-width:760px}
+.ct-title{font-family:var(--ct-font-head);font-size:clamp(22px,3vw,30px);margin:0 0 14px;font-weight:600;line-height:1.2}
+.ct-app-title{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.ct-app-wrap{margin:0 -16px}
+.entry-content > *:first-child{margin-top:0}
+.ce-aviso{background:var(--ct-surface);border:1px solid var(--ct-line);border-radius:8px;padding:16px 20px;max-width:520px}
+.ce-aviso .button,.ct-btn{display:inline-block;background:var(--ct-accent);color:var(--ct-accent-fg);padding:8px 16px;border-radius:6px;text-decoration:none}
+.ct-card{background:var(--ct-surface);border:1px solid var(--ct-line);border-radius:8px;padding:16px 20px}
+.ct-footer{border-top:1px solid var(--ct-line);color:var(--ct-muted);font-size:13px}
+.ct-footer-in{max-width:1500px;margin:0 auto;padding:14px 16px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px}
+.ct-credito a{color:inherit;font-weight:600;text-decoration:underline;text-underline-offset:2px}
+.ct-credito a:hover,.ct-credito a:focus-visible{color:var(--ct-brand,#0a4ba0)}
+.ct-notice{background:#fff0c2;color:#5a3d00;padding:10px 16px;text-align:center}
+.ct-notice a{color:inherit;font-weight:600}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
