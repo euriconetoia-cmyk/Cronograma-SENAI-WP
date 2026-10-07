@@ -1,6 +1,6 @@
 <?php
 if ( ! defined( 'CRONOGRAMA_EAD_VERSION' ) ) {
-	define( 'CRONOGRAMA_EAD_VERSION', '2.20.0-rc1' );
+	define( 'CRONOGRAMA_EAD_VERSION', '2.21.0-rc1' );
 }
 if ( ! defined( 'CRONOGRAMA_EAD_FILE' ) ) {
 	define( 'CRONOGRAMA_EAD_FILE', __FILE__ );
