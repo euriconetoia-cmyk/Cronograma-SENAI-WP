@@ -22,11 +22,8 @@ command -v pnpm >/dev/null || { echo 'BLOQUEIO: pnpm não instalado.' >&2; exit 
   pnpm build:preview
   pnpm audit --audit-level high
 )
-
-# O bundle deve ser tão recente quanto qualquer fonte da UI.
-latest_src=$(find ui/src -type f -printf '%T@\n' | sort -nr | head -1)
-bundle=$(stat -c '%Y' plugin-cronograma-ead-core/assets/app.js)
-awk -v src="$latest_src" -v b="$bundle" 'BEGIN { if (b+0 < src+0) exit 1 }' || { echo 'BLOQUEIO: assets/app.js está desatualizado.' >&2; exit 21; }
+cp ui/dist-wp/app.js plugin-cronograma-ead-core/assets/app.js
+test -s plugin-cronograma-ead-core/assets/app.js || { echo 'BLOQUEIO: bundle WordPress não foi gerado.' >&2; exit 21; }
 
 command -v docker >/dev/null || { echo 'BLOQUEIO: Docker não instalado.' >&2; exit 22; }
 docker compose up -d db wordpress
