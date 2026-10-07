@@ -7,7 +7,7 @@ class Sess{ constructor(){this.c={}}
   async login(u,p='senha123',redir=''){ this.c={wordpress_test_cookie:'WP%20Cookie%20check'}; const r=await this.req('/wp-login.php',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({log:u,pwd:p,'wp-submit':'Log In',redirect_to:redir,testcookie:'1'})}); return r }
   async nonce(pid){ let r=await this.req('/?page_id='+pid); if([301,302,303,307,308].includes(r.status)){ const loc=r.headers.get('location'); if(loc){ const u=new URL(loc,B); r=await this.req(u.pathname+u.search) } } const t=await r.text(); const m=t.match(/CRONOGRAMA_EAD\s*=\s*(\{.*?\});/s); return m?JSON.parse(m[1]).nonce:null }
   async api(method,path,body,n){ const r=await this.req('/?rest_route=/cronograma-ead/v1/'+path,{method,headers:{'Content-Type':'application/json','X-WP-Nonce':n},body:body===undefined?undefined:JSON.stringify(body)}); let j=null; try{j=await r.json()}catch{} return {status:r.status,j} } }
-const PID=4, run=Date.now()
+const IDS=JSON.parse(process.argv[2]); const PID=IDS.cronograma, run=Date.now()
 const adm=new Sess(); await adm.login('admin'); const na=await adm.nonce(PID)
 const eq2=new Sess(); await eq2.login('equipe2'); const ne2=await eq2.nonce(PID)
 const uni=new Sess(); const rl=await uni.login('coord_itb'); const nu=await uni.nonce(PID)
