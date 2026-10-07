@@ -31,6 +31,29 @@ c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_payload($bad)),'invalid weekday 
 
 echo "OK catalog-contract: multimodel catalog validation\n";
 
+$regional = $base;
+$regional['unidades'][0]['estado']='GO';
+$regional['cursos'][0]['modalidade']='ead';
+$cleanRegional = Cronograma_EAD_Store::sanitize_payload($regional);
+c_ok(!is_wp_error($cleanRegional),'valid UF/modalidade rejected');
+c_ok($cleanRegional['unidades'][0]['estado']==='GO','UF not preserved');
+c_ok($cleanRegional['cursos'][0]['modalidade']==='ead','EaD modality not preserved');
+
+$hibrido=$regional; $hibrido['cursos'][0]['modalidade']='semipresencial';
+c_ok(!is_wp_error(Cronograma_EAD_Store::sanitize_payload($hibrido)),'hybrid modality rejected');
+
+$legado=$regional; $legado['cursos'][0]['modalidade']='presencial';
+$cleanLegado=Cronograma_EAD_Store::sanitize_payload($legado);
+c_ok(!is_wp_error($cleanLegado) && $cleanLegado['cursos'][0]['modalidade']==='semipresencial','legacy presencial modality must migrate to hybrid');
+
+$badUf=$regional; $badUf['unidades'][0]['estado']='XX';
+c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_payload($badUf)),'invalid UF must be rejected');
+
+$badMod=$regional; $badMod['cursos'][0]['modalidade']='telepatia';
+c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_payload($badMod)),'invalid modality must be rejected');
+
+echo "OK UF and modality contract\n";
+
 $turma = array(
   'id'=>'t1','cursoId'=>'c1','nome'=>'Turma','unidadeId'=>'u1','inicio'=>'2026-03-02','evento'=>'',
   'monitorId'=>'','tutorId'=>'','coordId'=>'','profId'=>'','ambiente'=>'','itens'=>array(
