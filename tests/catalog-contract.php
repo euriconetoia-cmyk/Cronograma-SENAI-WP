@@ -47,3 +47,25 @@ $bad_t=$turma; $bad_t['itens']['i1']['eventos'][0]['d']='2026-02-31';
 c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_turma($bad_t)),'invalid pedagogical event date must be rejected');
 
 echo "OK pedagogical-event contract\n";
+
+
+$turma_cfg = $turma;
+$turma_cfg['personalizarCronograma'] = true;
+$turma_cfg['configuracaoCronograma'] = array(
+  'aprendizagem'=>array(
+    'faseIntensivaDiasUteis'=>10,
+    'diasIntensivos'=>array(1,2,3,4,5),
+    'diasAtendimentoRegular'=>array(3),
+    'horarioWebaula'=>'13:30 às 17:00'
+  )
+);
+$ct = Cronograma_EAD_Store::sanitize_turma($turma_cfg);
+c_ok(!is_wp_error($ct),'valid turma schedule override rejected');
+c_ok($ct['personalizarCronograma']===true,'turma personalization flag not preserved');
+c_ok($ct['configuracaoCronograma']['aprendizagem']['diasAtendimentoRegular'][0]===3,'turma aprendizagem override not preserved');
+
+$bad_cfg = $turma_cfg;
+$bad_cfg['configuracaoCronograma']['aprendizagem']['diasAtendimentoRegular']=array(8);
+c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_turma($bad_cfg)),'invalid turma weekday override must be rejected');
+
+echo "OK turma schedule override contract\n";
