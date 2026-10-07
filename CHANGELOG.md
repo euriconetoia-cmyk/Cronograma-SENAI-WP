@@ -14,6 +14,15 @@
 - Sugestões síncronas podem seguir sequência de dias permitidos; encontros presenciais mantêm distribuição compatível.
 - Prática profissional é uma etapa própria e compõe a carga total quando tiver CH informada.
 
+### Aprendizagem profissional
+- Atendimento em duas fases: intensiva em dias úteis consecutivos e regular em dias da semana selecionados.
+- Quantidade de dias úteis da fase intensiva configurável.
+- Dias da semana da fase intensiva e da fase regular configuráveis separadamente.
+- Horário e duração padrão da webaula configuráveis.
+- Datas de webaulas calculadas automaticamente com feriados.
+- Nova aba "Webaulas síncronas" no cronograma, com UC, sequência, data, dia, horário e fase.
+- Cenário de regressão baseado no modelo Assistente Administrativo Amazonas, com início em 14/10/2026, 23 dias úteis intensivos e transição para segunda e terça após 16/11/2026.
+
 ### Interface e exportação
 - Cadastro do curso recebe seletor de modelo, carga diária e regras de síncrono.
 - UC permite informar quantidade de momentos síncronos.
