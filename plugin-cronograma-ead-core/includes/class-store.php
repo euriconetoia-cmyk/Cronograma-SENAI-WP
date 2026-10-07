@@ -165,7 +165,7 @@ class Cronograma_EAD_Store {
 		if ( false === $raw || strlen( $raw ) > 262144 ) {
 			return new WP_Error( 'cronograma_ead_grande', 'Os dados da turma excedem o limite de 256 KB.', array( 'status' => 413 ) );
 		}
-		$allowed = array( 'id', 'cursoId', 'nome', 'unidadeId', 'inicio', 'fimManual', 'cursoSolicitado', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'obs', 'itens', 'status', 'versao', 'rev', 'prazo', 'vigente' );
+		$allowed = array( 'id', 'cursoId', 'nome', 'unidadeId', 'inicio', 'fimManual', 'cursoSolicitado', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'obs', 'itens', 'status', 'versao', 'rev', 'prazo', 'vigente', 'personalizarCronograma', 'configuracaoCronograma' );
 		foreach ( array_keys( $input ) as $k ) {
 			if ( ! in_array( (string) $k, $allowed, true ) ) {
 				return new WP_Error( 'cronograma_ead_campo', 'Campo de turma não permitido: ' . sanitize_text_field( (string) $k ) . '.', array( 'status' => 400 ) );
@@ -199,6 +199,42 @@ class Cronograma_EAD_Store {
 				return new WP_Error( 'cronograma_ead_invalido', "Data inválida em $k (use AAAA-MM-DD).", array( 'status' => 400 ) );
 			}
 		}
+		$t['personalizarCronograma'] = ! empty( $input['personalizarCronograma'] );
+		if ( isset( $input['configuracaoCronograma'] ) ) {
+			if ( ! is_array( $input['configuracaoCronograma'] ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Configuração de cronograma da turma inválida.', array( 'status' => 400 ) );
+			}
+			$cfg = self::clean( $input['configuracaoCronograma'] );
+			$cfg_allowed = array( 'cargaDiaria', 'diasEstudoPermitidos', 'presencial', 'sincrono', 'praticaProfissional', 'aprendizagem' );
+			foreach ( array_keys( $cfg ) as $cfg_key ) {
+				if ( ! in_array( (string) $cfg_key, $cfg_allowed, true ) ) {
+					return new WP_Error( 'cronograma_ead_campo', 'Configuração de turma não permitida: ' . sanitize_text_field( (string) $cfg_key ) . '.', array( 'status' => 400 ) );
+				}
+			}
+			if ( isset( $cfg['diasEstudoPermitidos'] ) && ! self::dias_semana_validos( $cfg['diasEstudoPermitidos'] ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Dias de estudo inválidos na turma.', array( 'status' => 400 ) );
+			}
+			foreach ( array( 'presencial', 'sincrono' ) as $tipo_evento ) {
+				if ( isset( $cfg[ $tipo_evento ] ) && ! is_array( $cfg[ $tipo_evento ] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Regra de evento inválida na turma.', array( 'status' => 400 ) );
+				}
+				if ( isset( $cfg[ $tipo_evento ]['diasPermitidos'] ) && ! self::dias_semana_validos( $cfg[ $tipo_evento ]['diasPermitidos'] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Dias permitidos inválidos na turma.', array( 'status' => 400 ) );
+				}
+			}
+			if ( isset( $cfg['aprendizagem'] ) ) {
+				if ( ! is_array( $cfg['aprendizagem'] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Configuração de Aprendizagem da turma inválida.', array( 'status' => 400 ) );
+				}
+				foreach ( array( 'diasIntensivos', 'diasAtendimentoRegular' ) as $campo_dias ) {
+					if ( isset( $cfg['aprendizagem'][ $campo_dias ] ) && ! self::dias_semana_validos( $cfg['aprendizagem'][ $campo_dias ] ) ) {
+						return new WP_Error( 'cronograma_ead_invalido', 'Dias de Aprendizagem inválidos na turma.', array( 'status' => 400 ) );
+					}
+				}
+			}
+			$t['configuracaoCronograma'] = $cfg;
+		}
+
 		$t['itens'] = array();
 		$in_itens = isset( $input['itens'] ) && is_array( $input['itens'] ) ? $input['itens'] : array();
 		if ( count( $in_itens ) > 500 ) {
