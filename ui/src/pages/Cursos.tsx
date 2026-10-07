@@ -6,7 +6,7 @@ import { Confirm, Field, Panel, uid, type ConfirmCopy } from '@/components/Field
 import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
 import type { Curso, Item, ModeloCronograma, Tipo } from '@/lib/types'
-import { diasEstudoItem, resolverPerfilCronograma } from '@/lib/scheduleProfiles'
+import { diasEstudoItem, MODELO_LABEL, resolverPerfilCronograma, validarConfiguracaoModelo } from '@/lib/scheduleProfiles'
 
 const TIPOS: [Tipo, string][] = [['intro', 'Introdutório'], ['uc', 'UC'], ['rec', 'Recuperação'], ['mat', 'Matrícula'], ['pratica', 'Prática profissional']]
 const ROW: Record<Tipo, string> = { intro: 'bg-row-intro', uc: 'bg-card', rec: 'bg-row-rec', mat: 'bg-row-intro', pratica: 'bg-row-intro' }
@@ -19,6 +19,7 @@ const alternarDia = (dias: number[], dia: number) => dias.includes(dia) ? dias.f
 export function CursosPage() {
   const { d, update, cursoId, setCursoId } = useStore()
   const [detalhe, setDetalhe] = useState(false) // no celular: lista ou detalhe
+  const [avancado, setAvancado] = useState(false)
   const [confirma, setConfirma] = useState<{ copy: ConfirmCopy; run: () => void } | null>(null)
   const c = d.cursos.find(x => x.id === cursoId) || d.cursos[0]
   const mut = (fn: (c: Curso) => void) => update(x => { fn(x.cursos.find(a => a.id === c.id)!) })
@@ -37,6 +38,8 @@ export function CursosPage() {
   if (!c) return <Panel><p className="text-sm text-muted-foreground">Nenhum curso cadastrado.</p><Button className="mt-3" onClick={novo}>{T.cursos.novo}</Button></Panel>
   const soma = c.modulos.reduce((s, m) => s + m.itens.filter(i => i.tipo === 'uc' || i.tipo === 'pratica').reduce((a, i) => a + (+i.ch || 0), 0), 0)
   const chOk = soma === +c.chTotal
+  const perfil = resolverPerfilCronograma(c)
+  const errosModelo = validarConfiguracaoModelo(c)
 
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
@@ -44,7 +47,7 @@ export function CursosPage() {
         <ul className="flex flex-col gap-1.5">
           {d.cursos.map(x => {
             const n = x.modulos.reduce((s, m) => s + m.itens.filter(i => i.tipo === 'uc').length, 0)
-            return <li key={x.id}><button onClick={() => { setCursoId(x.id); setDetalhe(true) }} aria-current={x.id === c.id} className={`min-h-[56px] w-full rounded-lg border px-3 py-2 text-left ${x.id === c.id ? 'border-primary bg-accent' : 'bg-card hover:border-primary'}`}><span className="block font-medium">{x.nome}</span><span className="text-xs text-muted-foreground">{[x.categoria && T.categoria[x.categoria]?.nome, x.modalidade && T.modalidade[x.modalidade]].filter(Boolean).join(' · ')}{x.categoria || x.modalidade ? ' · ' : ''}{n} UCs · {x.chTotal} h</span></button></li>
+            return <li key={x.id}><button onClick={() => { setCursoId(x.id); setDetalhe(true) }} aria-current={x.id === c.id} className={`min-h-[56px] w-full rounded-lg border px-3 py-2 text-left ${x.id === c.id ? 'border-primary bg-accent' : 'bg-card hover:border-primary'}`}><span className="flex items-center justify-between gap-2"><span className="block min-w-0 truncate font-medium">{x.nome}</span><span className="shrink-0 rounded-full border border-primary/30 bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">{MODELO_LABEL[x.modeloCronograma || 'qualificacao']}</span></span><span className="text-xs text-muted-foreground">{[x.categoria && T.categoria[x.categoria]?.nome, x.modalidade && T.modalidade[x.modalidade]].filter(Boolean).join(' · ')}{x.categoria || x.modalidade ? ' · ' : ''}{n} UCs · {x.chTotal} h</span></button></li>
           })}
         </ul>
       </Panel>
@@ -79,13 +82,19 @@ export function CursosPage() {
           <div className={`mt-3 rounded-md px-3 py-2 text-sm ${chOk ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-destructive'}`}>{chOk ? T.cursos.chOk(soma, +c.chTotal) : T.cursos.chErro(soma, +c.chTotal)}</div>
         </Panel>
 
-        <Panel title={T.cursos.regras}>
+        <Panel title={T.cursos.regras} actions={<label className="flex items-center gap-2 text-xs font-medium"><input type="checkbox" checked={avancado} onChange={e => setAvancado(e.target.checked)} />Mostrar configurações avançadas</label>}>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-primary/30 bg-accent px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary">{MODELO_LABEL[c.modeloCronograma || 'qualificacao']}</span>
+            <span className="text-sm text-muted-foreground">Somente regras compatíveis com este modelo são exibidas por padrão.</span>
+          </div>
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
-            <Field label="Horas por encontro presencial"><input type="number" min={1} className="field-input mono" value={c.regras.hEncontro} onChange={e => mut(k => { k.regras.hEncontro = +e.target.value })} /></Field>
-            <Field label="Horário padrão dos encontros"><input className="field-input" value={c.regras.horario} onChange={e => mut(k => { k.regras.horario = e.target.value })} /></Field>
-            <Field label="Webconferência: dias antes do encontro"><input type="number" min={0} className="field-input mono" value={c.regras.webDias} onChange={e => mut(k => { k.regras.webDias = +e.target.value })} /></Field>
-            <Field label="Webconferência: hora"><input className="field-input" value={c.regras.webHora} onChange={e => mut(k => { k.regras.webHora = e.target.value })} /></Field>
-            <Field label="Postagem de notas: dias úteis depois"><input type="number" min={0} className="field-input mono" value={c.regras.postDias} onChange={e => mut(k => { k.regras.postDias = +e.target.value })} /></Field>
+            {(c.modeloCronograma === 'tecnico' || c.modeloCronograma === 'qualificacao' || c.modeloCronograma === 'personalizado' || avancado) && <>
+              <Field label="Horas por encontro presencial"><input type="number" min={1} className="field-input mono" value={c.regras.hEncontro} onChange={e => mut(k => { k.regras.hEncontro = +e.target.value })} /></Field>
+              <Field label="Horário padrão dos encontros"><input className="field-input" value={c.regras.horario} onChange={e => mut(k => { k.regras.horario = e.target.value })} /></Field>
+              <Field label="Webconferência: dias antes do encontro"><input type="number" min={0} className="field-input mono" value={c.regras.webDias} onChange={e => mut(k => { k.regras.webDias = +e.target.value })} /></Field>
+              <Field label="Webconferência: hora"><input className="field-input" value={c.regras.webHora} onChange={e => mut(k => { k.regras.webHora = e.target.value })} /></Field>
+              <Field label="Postagem de notas: dias úteis depois"><input type="number" min={0} className="field-input mono" value={c.regras.postDias} onChange={e => mut(k => { k.regras.postDias = +e.target.value })} /></Field>
+            </>}
             {(c.modeloCronograma === 'distribuicao_diaria' || c.modeloCronograma === 'personalizado') && <Field label="Carga diária para distribuição (h)"><input type="number" min={0.5} step={0.5} className="field-input mono" value={c.configuracaoCronograma?.cargaDiaria ?? 3} onChange={e => mut(k => { k.configuracaoCronograma = { ...(k.configuracaoCronograma || {}), cargaDiaria: +e.target.value } })} /></Field>}
             {c.modeloCronograma === 'aprendizagem' && <>
               <Field label="Fase intensiva: dias úteis de atendimento"><input type="number" min={0} className="field-input mono" value={c.configuracaoCronograma?.aprendizagem?.faseIntensivaDiasUteis ?? 23} onChange={e => mut(k => { k.configuracaoCronograma = { ...(k.configuracaoCronograma || {}), aprendizagem: { ...(k.configuracaoCronograma?.aprendizagem || {}), faseIntensivaDiasUteis: Math.max(0, +e.target.value) } } })} /></Field>
@@ -98,6 +107,21 @@ export function CursosPage() {
               <Field label="Duração padrão do momento síncrono (h)"><input type="number" min={0.5} step={0.5} className="field-input mono" value={c.configuracaoCronograma?.sincrono?.duracaoHoras ?? 2} onChange={e => mut(k => { k.configuracaoCronograma = { ...(k.configuracaoCronograma || {}), sincrono: { ...(k.configuracaoCronograma?.sincrono || {}), ativo: true, modo: 'quantidade', duracaoHoras: +e.target.value } } })} /></Field>
               <Field label="Dias permitidos para síncrono (0=dom ... 6=sáb)"><input className="field-input mono" value={(c.configuracaoCronograma?.sincrono?.diasPermitidos ?? [1,2,3,4,5]).join(',')} onChange={e => mut(k => { k.configuracaoCronograma = { ...(k.configuracaoCronograma || {}), sincrono: { ...(k.configuracaoCronograma?.sincrono || {}), ativo: true, modo: 'quantidade', diasPermitidos: parseDias(e.target.value) } } })} /></Field>
             </>}
+          </div>
+          <div className="mt-4 rounded-lg border bg-secondary/40 p-3 text-sm">
+            <div className="mb-1 font-semibold">Resumo das regras</div>
+            <div className="grid gap-1 sm:grid-cols-2">
+              <span><b>Modelo:</b> {MODELO_LABEL[perfil.modelo]}</span>
+              <span><b>Dias de estudo:</b> {perfil.diasEstudoPermitidos.join(', ')}</span>
+              {perfil.modelo === 'distribuicao_diaria' && <span><b>Carga diária:</b> {perfil.cargaDiaria} h</span>}
+              {perfil.modelo === 'aprendizagem' && perfil.aprendizagem && <>
+                <span><b>Fase intensiva:</b> {perfil.aprendizagem.faseIntensivaDiasUteis} dias úteis</span>
+                <span><b>Atendimento semanal:</b> dias {perfil.aprendizagem.diasAtendimentoRegular.join(', ')}</span>
+                <span><b>Webaula:</b> {perfil.aprendizagem.horarioWebaula || 'horário não informado'}</span>
+              </>}
+              {(perfil.modelo === 'tecnico' || perfil.modelo === 'qualificacao') && <span><b>Presencial:</b> {perfil.presencial.ativo ? `${perfil.presencial.modo} · dias ${perfil.presencial.diasPermitidos.join(', ')}` : 'desativado'}</span>}
+            </div>
+            {errosModelo.length > 0 && <div className="mt-2 rounded-md bg-bad-soft px-3 py-2 text-destructive"><b>Corrija antes de homologar:</b><ul className="ml-5 list-disc">{errosModelo.map(e => <li key={e}>{e}</li>)}</ul></div>}
           </div>
           <p className="mt-3 max-w-prose text-xs leading-relaxed text-muted-foreground">Perfil ativo: <b>{MODELOS.find(x => x[0] === (c.modeloCronograma ?? 'qualificacao'))?.[1]}</b>. {c.modeloCronograma === 'aprendizagem' ? 'As webaulas são calculadas por duas fases: atendimento diário no período intensivo e, depois, nos dias semanais selecionados.' : c.modeloCronograma === 'distribuicao_diaria' ? 'Os dias de estudo são calculados pela carga diária configurada.' : 'O comportamento atual de EaD e encontros presenciais é preservado.'}</p>
         </Panel>
