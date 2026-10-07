@@ -5,7 +5,7 @@ class Sess{ constructor(){this.c={}}
   sv(r){ for(const s of r.headers.getSetCookie?.()||[]){ const [kv]=s.split(';'); const i=kv.indexOf('='); this.c[kv.slice(0,i)]=kv.slice(i+1) } }
   async req(path,o={}){ const r=await fetch(B+path,{redirect:'manual',...o,headers:{...(o.headers||{}),Cookie:this.ck()}}); this.sv(r); return r }
   async login(u){ this.c={wordpress_test_cookie:'WP%20Cookie%20check'}; const r=await this.req('/wp-login.php',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({log:u,pwd:'senha123','wp-submit':'Log In',redirect_to:B+'/wp-admin/',testcookie:'1'})}); return r.status }
-  async page(id){ const r=await this.req('/?page_id='+id); const t=await r.text(); const m=t.match(/CRONOGRAMA_EAD\s*=\s*(\{.*?\});/s); return {status:r.status,html:t,cfg:m?JSON.parse(m[1]):null} }
+  async page(id){ let r=await this.req('/?page_id='+id); if([301,302,303,307,308].includes(r.status)){ const loc=r.headers.get('location'); if(loc){ const u=new URL(loc,B); r=await this.req(u.pathname+u.search) } } const t=await r.text(); const m=t.match(/CRONOGRAMA_EAD\s*=\s*(\{.*?\});/s); return {status:r.status,html:t,cfg:m?JSON.parse(m[1]):null} }
   async api(method,path,body,nonce){ const r=await this.req('/?rest_route=/cronograma-ead/v1/'+path,{method,headers:{'Content-Type':'application/json','X-WP-Nonce':nonce},body:body===undefined?undefined:JSON.stringify(body)}); let j=null; try{j=await r.json()}catch{} return {status:r.status,j} } }
 
 const pid=13; const U={}
