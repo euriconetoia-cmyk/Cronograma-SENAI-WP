@@ -4,7 +4,7 @@ on:
     branches:
       - release/2.20.0-rc1
     paths:
-      - '.bootstrap/2.20.patch'
+      - '.bootstrap/part-*'
 permissions:
   contents: write
 jobs:
@@ -18,7 +18,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 -d .bootstrap/2.20.patch | gzip -d > /tmp/2.20.patch
+          test -f .bootstrap/part-01 || { echo "Waiting for final patch chunk"; exit 0; }
+          cat .bootstrap/part-00 .bootstrap/part-01 | base64 -d | gzip -d > /tmp/2.20.patch
           git apply --check /tmp/2.20.patch
           git apply /tmp/2.20.patch
           rm -rf .bootstrap
