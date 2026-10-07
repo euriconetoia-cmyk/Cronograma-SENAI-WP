@@ -5,5 +5,8 @@ parameters:
   excludePaths:
     analyse:
       - plugin-cronograma-ead-core/assets
-  bootstrapFiles: []
+  scanFiles:
+    - vendor/php-stubs/wordpress-stubs/wordpress-stubs.php
+  bootstrapFiles:
+    - tests/phpstan-bootstrap.php
   treatPhpDocTypesAsCertain: false
