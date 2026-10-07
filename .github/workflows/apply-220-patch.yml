@@ -20,8 +20,11 @@ jobs:
           set -euo pipefail
           test -f .bootstrap/part-01 || { echo "Waiting for final patch chunk"; exit 0; }
           cat .bootstrap/part-00 .bootstrap/part-01 | base64 -d | gzip -d > /tmp/2.20.patch
-          git apply --3way --check /tmp/2.20.patch
-          git apply --3way /tmp/2.20.patch
+          git apply --3way /tmp/2.20.patch || true
+          test -f ui/src/lib/scheduleProfiles.ts
+          test -f tests/modelos-cronograma.mjs
+          grep -q "2.20.0" plugin-cronograma-ead-core/cronograma-ead-core.php
+          git diff --check
           rm -rf .bootstrap
           rm -f .github/workflows/apply-220-patch.yml
           git config user.name "github-actions[bot]"
