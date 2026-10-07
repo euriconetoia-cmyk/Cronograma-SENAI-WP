@@ -12,6 +12,7 @@ export interface Api {
   mock?: boolean
   boot(): Promise<Boot>
   saveCatalogo(data: Catalogo, rev: number): Promise<{ rev: number }>
+  feriadosNacionais(ano: number): Promise<{ ano: number; feriados: [string, string][]; cache: boolean }>
   criar(turma: Partial<Turma> & { id: string }): Promise<Turma>
   salvar(id: string, turma: Turma, rev: number, motivo?: string): Promise<Turma>
   acao(id: string, body: AcaoBody): Promise<Turma>
@@ -59,6 +60,7 @@ export function realApi(c: Config): Api {
   return {
     boot: () => call('GET', 'bootstrap'),
     saveCatalogo: (data, rev) => call('POST', 'catalogo', { data, rev }),
+    feriadosNacionais: ano => call('GET', `feriados/nacionais/${ano}`),
     criar: turma => call('POST', 'turmas', { turma }),
     salvar: (id, turma, rev, motivo) => call('POST', `turmas/${id}`, { turma, rev, motivo }),
     acao: (id, body) => call('POST', `turmas/${id}/acao`, body),
