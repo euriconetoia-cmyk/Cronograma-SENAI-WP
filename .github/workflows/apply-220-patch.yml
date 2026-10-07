@@ -18,8 +18,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git apply --check .bootstrap/2.20.patch
-          git apply .bootstrap/2.20.patch
+          base64 -d .bootstrap/2.20.patch | gzip -d > /tmp/2.20.patch
+          git apply --check /tmp/2.20.patch
+          git apply /tmp/2.20.patch
           rm -rf .bootstrap
           rm -f .github/workflows/apply-220-patch.yml
           git config user.name "github-actions[bot]"
