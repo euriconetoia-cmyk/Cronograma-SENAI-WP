@@ -735,15 +735,21 @@ class Cronograma_EAD_Service {
 		foreach ( Cronograma_EAD_DB::listar( null ) as $r ) {
 			$turmas[] = self::presentar( $r );
 		}
-		$data = array( 'catalogo' => $cat['data'], 'turmas' => $turmas );
+		$normal_cat = Cronograma_EAD_Store::sanitize_payload( $cat['data'] );
+		$normal_turmas = array();
+		foreach ( $turmas as $turma_exportada ) {
+			$normal = Cronograma_EAD_Store::sanitize_turma( $turma_exportada );
+			$normal_turmas[] = is_wp_error( $normal ) ? $turma_exportada : $normal;
+		}
 		$out = array(
 			'format' => 'cronogramas-ead',
 			'schemaVersion' => 4,
 			'backupMode' => 'full-state',
+			'checksumMode' => 'normalized-v1',
 			'applicationVersion' => CRONOGRAMA_EAD_VERSION,
 			'generatedAt' => gmdate( 'c' ),
 			'siteId' => hash( 'sha256', home_url( '/' ) ),
-			'checksum' => self::checksum_backup( $cat['data'], $turmas ),
+			'checksum' => self::checksum_backup( is_wp_error( $normal_cat ) ? $cat['data'] : $normal_cat, $normal_turmas ),
 			'catalogo' => $cat['data'],
 			'turmas' => $turmas,
 		);
@@ -767,15 +773,18 @@ class Cronograma_EAD_Service {
 		if ( is_wp_error( $cat ) ) {
 			return $cat;
 		}
+		$checksum_normalizado = isset( $body['checksumMode'] ) && 'normalized-v1' === (string) $body['checksumMode'];
 		if ( in_array( $schema, array( 3, 4 ), true ) ) {
 			if ( 'cronogramas-ead' !== $format || empty( $body['checksum'] ) ) {
 				return self::erro( 'formato', 'Backup sem identificação ou checksum válido.', 422 );
 			}
-			$calc = self::checksum_backup( $body['catalogo'], $body['turmas'] );
-			// Compatibilidade com backups v3/v4 gerados antes do checksum canônico.
-			$legacy_calc = hash( 'sha256', wp_json_encode( array( 'catalogo' => $body['catalogo'], 'turmas' => $body['turmas'] ) ) );
-			if ( ! hash_equals( (string) $body['checksum'], $calc ) && ! hash_equals( (string) $body['checksum'], $legacy_calc ) ) {
-				return self::erro( 'checksum', 'A cópia falhou na verificação de integridade.', 422 );
+			if ( ! $checksum_normalizado ) {
+				$calc = self::checksum_backup( $body['catalogo'], $body['turmas'] );
+				// Compatibilidade com backups v3/v4 gerados antes do checksum canônico.
+				$legacy_calc = hash( 'sha256', wp_json_encode( array( 'catalogo' => $body['catalogo'], 'turmas' => $body['turmas'] ) ) );
+				if ( ! hash_equals( (string) $body['checksum'], $calc ) && ! hash_equals( (string) $body['checksum'], $legacy_calc ) ) {
+					return self::erro( 'checksum', 'A cópia falhou na verificação de integridade.', 422 );
+				}
 			}
 		}
 		$validas = array();
@@ -800,6 +809,12 @@ class Cronograma_EAD_Service {
 				$ignoradas++;
 			}
 			$validas[] = $t;
+		}
+		if ( $checksum_normalizado ) {
+			$calc_normalizado = self::checksum_backup( $cat, $validas );
+			if ( ! hash_equals( (string) $body['checksum'], $calc_normalizado ) ) {
+				return self::erro( 'checksum', 'A cópia falhou na verificação de integridade.', 422 );
+			}
 		}
 		$modo_completo = 4 === $schema && isset( $body['backupMode'] ) && 'full-state' === $body['backupMode'];
 		if ( $modo_completo ) {
