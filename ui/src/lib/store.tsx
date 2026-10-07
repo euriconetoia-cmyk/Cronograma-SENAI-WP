@@ -4,10 +4,10 @@ import { ApiError, type AcaoBody, type Api } from './api'
 import { podeEditar } from './rules'
 import type { Aviso, AvisosResp, Boot, Catalogo, Dados, Me, Turma } from './types'
 
-export type Page = 'inicio' | 'cronograma' | 'turmas' | 'cursos' | 'equipe' | 'acessos' | 'unidades' | 'feriados' | 'backup'
-export const PAGES_EQUIPE: Page[] = ['inicio', 'cronograma', 'turmas', 'cursos', 'equipe', 'acessos', 'unidades', 'feriados', 'backup']
+export type Page = 'inicio' | 'cronograma' | 'turmas' | 'cursos' | 'equipe' | 'acessos' | 'unidades' | 'feriados' | 'integracoes' | 'backup'
+export const PAGES_EQUIPE: Page[] = ['inicio', 'cronograma', 'turmas', 'cursos', 'equipe', 'acessos', 'unidades', 'feriados', 'integracoes', 'backup']
 /** Páginas que ficam dentro do menu Configurações. */
-export const CONFIG_PAGES: Page[] = ['equipe', 'acessos', 'unidades', 'feriados', 'backup']
+export const CONFIG_PAGES: Page[] = ['equipe', 'acessos', 'unidades', 'feriados', 'integracoes', 'backup']
 export const PAGES_UNIDADE: Page[] = ['inicio', 'cronograma', 'turmas']
 export type Salvo = 'ok' | 'sujo' | 'salvando' | 'erro'
 
