@@ -26,6 +26,7 @@ class Cronograma_EAD_Admin {
 			'pages'    => 'Páginas conferidas. As que faltavam foram criadas.',
 			'seed'     => 'Dados de exemplo restaurados.',
 			'settings' => 'Configurações salvas.',
+			'reset'    => 'Cursos e cronogramas removidos. O ambiente está pronto para um novo teste.',
 		);
 		?>
 		<div class="wrap">
@@ -114,6 +115,16 @@ class Cronograma_EAD_Admin {
 			</table>
 
 			<?php if ( current_user_can( 'manage_options' ) ) : ?>
+				<h2>Reiniciar dados de homologação</h2>
+				<p>Remove todos os <strong>cursos</strong>, <strong>cronogramas/turmas</strong>, versões, históricos e avisos. Mantém unidades, pessoas/equipe, feriados, usuários e configurações.</p>
+				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Esta ação apagará todos os cursos e cronogramas de teste. Continuar?');" style="margin-bottom:18px">
+					<input type="hidden" name="action" value="cronograma_ead_reset_teste">
+					<?php wp_nonce_field( 'cronograma_ead_reset_teste' ); ?>
+					<label>Digite <code>APAGAR</code> para confirmar:
+						<input type="text" name="confirmacao" required autocomplete="off" style="width:120px">
+					</label>
+					<button class="button button-secondary">Limpar cursos e cronogramas</button>
+				</form>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('Isto troca cursos, equipe, feriados e unidades pelos dados de exemplo e recoloca a turma de exemplo. Turmas que você criou continuam. Continuar?');">
 					<input type="hidden" name="action" value="cronograma_ead_seed">
 					<?php wp_nonce_field( 'cronograma_ead_seed' ); ?>
@@ -144,6 +155,24 @@ class Cronograma_EAD_Admin {
 		$em = isset( $_POST['email_equipe'] ) ? sanitize_text_field( wp_unslash( $_POST['email_equipe'] ) ) : '';
 		update_option( 'cronograma_ead_email_equipe', $em, false );
 		wp_safe_redirect( admin_url( 'admin.php?page=cronograma-ead&ce_msg=settings' ) );
+		exit;
+	}
+
+	public static function handle_reset_teste() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( 'Sem permissão.', 403 );
+		}
+		check_admin_referer( 'cronograma_ead_reset_teste' );
+		$confirmacao = isset( $_POST['confirmacao'] ) ? sanitize_text_field( wp_unslash( $_POST['confirmacao'] ) ) : '';
+		if ( 'APAGAR' !== $confirmacao ) {
+			wp_die( 'Confirmação inválida. Digite APAGAR para executar a limpeza.', 400 );
+		}
+		$ok = Cronograma_EAD_DB::limpar_dados_teste();
+		if ( is_wp_error( $ok ) ) {
+			wp_die( esc_html( $ok->get_error_message() ), 500 );
+		}
+		Cronograma_EAD_Store::limpar_cursos();
+		wp_safe_redirect( admin_url( 'admin.php?page=cronograma-ead&ce_msg=reset' ) );
 		exit;
 	}
 
