@@ -57,7 +57,7 @@ export function BackupPage() {
         {sim && <p role="status" className="mt-3 rounded-md bg-secondary px-3 py-2 text-sm">Simulação concluída: o backup contém {sim.criadas + sim.atualizadas + sim.ignoradas} turma(s); {sim.criadas} ainda não existem neste ambiente e {sim.atualizadas} possuem o mesmo identificador. {copia?.backupMode === 'full-state' ? 'A restauração substituirá o estado atual pelo conteúdo desta cópia.' : `${sim.ignoradas} serão ignoradas pelo formato legado.`} Nenhum dado foi alterado ainda.</p>}
         {erro && <p role="alert" className="mt-3 rounded-md bg-bad-soft px-3 py-2 text-sm text-destructive">{erro}</p>}
       </Panel>
-      <Confirm copy={conf ? (copia?.backupMode === 'full-state' ? { titulo: 'Restaurar este backup?', texto: 'Cursos, unidades, feriados e turmas serão substituídos pelo estado salvo neste arquivo. Uma cópia automática do estado atual será criada antes.', confirmar: 'Restaurar backup' } : T.backup.confirma) : null} onClose={() => setConf(false)} onConfirm={() => void carregar()} />
+      <Confirm copy={conf ? (copia?.backupMode === 'full-state' ? { titulo: 'Restaurar este backup?', texto: 'Cursos, unidades, feriados e turmas serão substituídos pelo estado salvo neste arquivo. Uma cópia automática do estado atual será criada antes.', ok: 'Restaurar backup', voltar: 'Cancelar' } : T.backup.confirma) : null} onClose={() => setConf(false)} onConfirm={() => void carregar()} />
     </div>
   )
 }
