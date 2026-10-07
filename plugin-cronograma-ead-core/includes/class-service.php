@@ -803,6 +803,7 @@ class Cronograma_EAD_Service {
 			return self::erro( 'invalido', 'Revisão atual ausente.', 400 );
 		}
 		$pre_backup = self::exportar();
+		$catalog_before = Cronograma_EAD_Store::get();
 		update_option( 'cronograma_ead_pre_import_backup', wp_json_encode( $pre_backup ), false );
 		update_option( 'cronograma_ead_pre_import_backup_at', gmdate( 'c' ), false );
 		Cronograma_EAD_DB::begin();
@@ -814,11 +815,13 @@ class Cronograma_EAD_Service {
 		if ( ! empty( $prep['fullRestore'] ) ) {
 			if ( ! Cronograma_EAD_DB::limpar_para_restauracao() ) {
 				Cronograma_EAD_DB::rollback();
+				Cronograma_EAD_Store::restore_snapshot( $catalog_before );
 				return self::erro( 'restauracao', 'Não foi possível limpar o estado atual para restaurar a cópia. Nada foi alterado.', 500 );
 			}
 			foreach ( $prep['turmas'] as $t ) {
 				if ( ! Cronograma_EAD_DB::restaurar_turma( $t, get_current_user_id() ) ) {
 					Cronograma_EAD_DB::rollback();
+					Cronograma_EAD_Store::restore_snapshot( $catalog_before );
 					return self::erro( 'restauracao', 'Falha ao restaurar uma turma. Nada foi alterado.', 500 );
 				}
 				if ( ! empty( $t['vigente'] ) && is_array( $t['vigente'] ) ) {
@@ -859,12 +862,14 @@ class Cronograma_EAD_Service {
 				if ( ! $row ) {
 					if ( ! Cronograma_EAD_DB::inserir( $t, Cronograma_EAD_Rules::S_ELABORACAO, get_current_user_id() ) ) {
 						Cronograma_EAD_DB::rollback();
+						Cronograma_EAD_Store::restore_snapshot( $catalog_before );
 						return self::erro( 'importacao', 'Falha ao criar turma durante a importação. Nada foi alterado.', 500 );
 					}
 				} elseif ( in_array( $row->status, array( 'elaboracao', 'solicitado' ), true ) ) {
 					$novo = Cronograma_EAD_Rules::merge_equipe( self::decodificar( $row ), $t, self::ids_do_curso( $prep['catalogo'], $t['cursoId'] ) );
 					if ( ! Cronograma_EAD_DB::atualizar( $row->id, $row->rev, array( 'data' => $novo, 'unidade_id' => $t['unidadeId'] ), get_current_user_id() ) ) {
 						Cronograma_EAD_DB::rollback();
+						Cronograma_EAD_Store::restore_snapshot( $catalog_before );
 						return self::erro( 'conflito', 'Uma turma mudou durante a importação. Nada foi alterado.', 409 );
 					}
 				}
@@ -872,6 +877,7 @@ class Cronograma_EAD_Service {
 		}
 		if ( ! Cronograma_EAD_DB::commit() ) {
 			Cronograma_EAD_DB::rollback();
+			Cronograma_EAD_Store::restore_snapshot( $catalog_before );
 			return self::erro( 'importacao', 'Não foi possível concluir a importação.', 500 );
 		}
 		Cronograma_EAD_DB::audit_admin( 'importar_backup', 'sistema', '', 'ok', array( 'modo' => ! empty( $prep['fullRestore'] ) ? 'restauracao_completa' : 'importacao_legada', 'criadas' => $prep['criadas'], 'atualizadas' => $prep['atualizadas'], 'ignoradas' => $prep['ignoradas'] ) );
