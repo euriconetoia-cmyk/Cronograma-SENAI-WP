@@ -654,6 +654,45 @@ class Cronograma_EAD_Service {
 		return $saved;
 	}
 
+	/** Consulta e armazena em cache os feriados nacionais brasileiros. */
+	public static function feriados_nacionais( $ano ) {
+		$ano = (int) $ano;
+		if ( $ano < 1900 || $ano > 2199 ) {
+			return self::erro( 'ano', 'Ano inválido para consulta de feriados.', 400 );
+		}
+		$key = 'cronograma_ead_feriados_br_' . $ano;
+		$cached = get_transient( $key );
+		if ( is_array( $cached ) ) {
+			return array( 'ano' => $ano, 'feriados' => $cached, 'cache' => true );
+		}
+		$url = 'https://brasilapi.com.br/api/feriados/v1/' . $ano;
+		$res = wp_safe_remote_get( $url, array( 'timeout' => 8, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
+		if ( is_wp_error( $res ) ) {
+			return self::erro( 'feriados_indisponiveis', 'Não foi possível consultar os feriados nacionais agora. Tente novamente mais tarde.', 503 );
+		}
+		$status = (int) wp_remote_retrieve_response_code( $res );
+		$body = json_decode( wp_remote_retrieve_body( $res ), true );
+		if ( 200 !== $status || ! is_array( $body ) ) {
+			return self::erro( 'feriados_indisponiveis', 'O serviço de feriados nacionais retornou uma resposta inválida.', 503 );
+		}
+		$out = array();
+		foreach ( $body as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$data = isset( $item['date'] ) ? sanitize_text_field( (string) $item['date'] ) : '';
+			$nome = isset( $item['name'] ) ? sanitize_text_field( (string) $item['name'] ) : 'Feriado nacional';
+			if ( Cronograma_EAD_Rules::data_ok( $data ) ) {
+				$out[] = array( $data, $nome );
+			}
+		}
+		if ( ! $out ) {
+			return self::erro( 'feriados_indisponiveis', 'Nenhum feriado nacional foi retornado para o ano informado.', 503 );
+		}
+		set_transient( $key, $out, 30 * DAY_IN_SECONDS );
+		return array( 'ano' => $ano, 'feriados' => $out, 'cache' => false );
+	}
+
 	/** Cópia completa, versionada e verificável por checksum. */
 	public static function exportar() {
 		$cat    = Cronograma_EAD_Store::get();
