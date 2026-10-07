@@ -703,7 +703,8 @@ class Cronograma_EAD_Service {
 		$data = array( 'catalogo' => $cat['data'], 'turmas' => $turmas );
 		$out = array(
 			'format' => 'cronogramas-ead',
-			'schemaVersion' => 3,
+			'schemaVersion' => 4,
+			'backupMode' => 'full-state',
 			'applicationVersion' => CRONOGRAMA_EAD_VERSION,
 			'generatedAt' => gmdate( 'c' ),
 			'siteId' => hash( 'sha256', home_url( '/' ) ),
@@ -721,19 +722,19 @@ class Cronograma_EAD_Service {
 		}
 		$format = isset( $body['format'] ) ? (string) $body['format'] : ( isset( $body['formato'] ) ? (string) $body['formato'] : '' );
 		$schema = isset( $body['schemaVersion'] ) ? (int) $body['schemaVersion'] : ( 'cronogramas-ead-2' === $format ? 2 : 0 );
-		if ( $schema > 3 ) {
+		if ( $schema > 4 ) {
 			return self::erro( 'versao_futura', 'Esta cópia foi criada por uma versão mais nova do sistema.', 422 );
 		}
-		if ( ! in_array( $schema, array( 0, 2, 3 ), true ) ) {
+		if ( ! in_array( $schema, array( 0, 2, 3, 4 ), true ) ) {
 			return self::erro( 'versao', 'Versão de backup não suportada.', 422 );
 		}
 		$cat = Cronograma_EAD_Store::sanitize_payload( $body['catalogo'] );
 		if ( is_wp_error( $cat ) ) {
 			return $cat;
 		}
-		if ( 3 === $schema ) {
+		if ( in_array( $schema, array( 3, 4 ), true ) ) {
 			if ( 'cronogramas-ead' !== $format || empty( $body['checksum'] ) ) {
-				return self::erro( 'formato', 'Backup versão 3 sem identificação ou checksum válido.', 422 );
+				return self::erro( 'formato', 'Backup sem identificação ou checksum válido.', 422 );
 			}
 			$calc = hash( 'sha256', wp_json_encode( array( 'catalogo' => $body['catalogo'], 'turmas' => $body['turmas'] ) ) );
 			if ( ! hash_equals( (string) $body['checksum'], $calc ) ) {
@@ -763,7 +764,21 @@ class Cronograma_EAD_Service {
 			}
 			$validas[] = $t;
 		}
-		return array( 'catalogo' => $cat, 'turmas' => $validas, 'criadas' => $criadas, 'atualizadas' => $atualizadas, 'ignoradas' => $ignoradas, 'schemaVersion' => $schema, 'digest' => hash( 'sha256', wp_json_encode( array( 'catalogo' => $cat, 'turmas' => $validas ) ) ) );
+		$modo_completo = 4 === $schema && isset( $body['backupMode'] ) && 'full-state' === $body['backupMode'];
+		if ( $modo_completo ) {
+			$atuais = array();
+			foreach ( Cronograma_EAD_DB::listar( null ) as $row_atual ) {
+				$atuais[ $row_atual->id ] = true;
+			}
+			$ids_backup = array();
+			foreach ( $validas as $t_backup ) {
+				$ids_backup[ $t_backup['id'] ] = true;
+			}
+			$criadas = count( array_diff_key( $ids_backup, $atuais ) );
+			$atualizadas = count( array_intersect_key( $ids_backup, $atuais ) );
+			$ignoradas = 0;
+		}
+		return array( 'catalogo' => $cat, 'turmas' => $validas, 'criadas' => $criadas, 'atualizadas' => $atualizadas, 'ignoradas' => $ignoradas, 'schemaVersion' => $schema, 'fullRestore' => $modo_completo, 'digest' => hash( 'sha256', wp_json_encode( array( 'catalogo' => $cat, 'turmas' => $validas ) ) ) );
 	}
 
 	/** Simula ou executa uma importação de forma atômica. */
@@ -796,18 +811,62 @@ class Cronograma_EAD_Service {
 			Cronograma_EAD_DB::rollback();
 			return $saved;
 		}
-		foreach ( $prep['turmas'] as $t ) {
-			$row = Cronograma_EAD_DB::get( $t['id'] );
-			if ( ! $row ) {
-				if ( ! Cronograma_EAD_DB::inserir( $t, Cronograma_EAD_Rules::S_ELABORACAO, get_current_user_id() ) ) {
+		if ( ! empty( $prep['fullRestore'] ) ) {
+			if ( ! Cronograma_EAD_DB::limpar_para_restauracao() ) {
+				Cronograma_EAD_DB::rollback();
+				return self::erro( 'restauracao', 'Não foi possível limpar o estado atual para restaurar a cópia. Nada foi alterado.', 500 );
+			}
+			foreach ( $prep['turmas'] as $t ) {
+				if ( ! Cronograma_EAD_DB::restaurar_turma( $t, get_current_user_id() ) ) {
 					Cronograma_EAD_DB::rollback();
-					return self::erro( 'importacao', 'Falha ao criar turma durante a importação. Nada foi alterado.', 500 );
+					return self::erro( 'restauracao', 'Falha ao restaurar uma turma. Nada foi alterado.', 500 );
 				}
-			} elseif ( in_array( $row->status, array( 'elaboracao', 'solicitado' ), true ) ) {
-				$novo = Cronograma_EAD_Rules::merge_equipe( self::decodificar( $row ), $t, self::ids_do_curso( $prep['catalogo'], $t['cursoId'] ) );
-				if ( ! Cronograma_EAD_DB::atualizar( $row->id, $row->rev, array( 'data' => $novo, 'unidade_id' => $t['unidadeId'] ), get_current_user_id() ) ) {
-					Cronograma_EAD_DB::rollback();
-					return self::erro( 'conflito', 'Uma turma mudou durante a importação. Nada foi alterado.', 409 );
+				if ( ! empty( $t['vigente'] ) && is_array( $t['vigente'] ) ) {
+					$curso_snapshot = null;
+					foreach ( $prep['catalogo']['cursos'] as $curso_cat ) {
+						if ( isset( $curso_cat['id'] ) && $curso_cat['id'] === $t['cursoId'] ) {
+							$curso_snapshot = $curso_cat;
+							break;
+						}
+					}
+					$unidade_snapshot = null;
+					foreach ( $prep['catalogo']['unidades'] as $unidade_cat ) {
+						if ( isset( $unidade_cat['id'] ) && $unidade_cat['id'] === $t['unidadeId'] ) {
+							$unidade_snapshot = $unidade_cat;
+							break;
+						}
+					}
+					$snapshot = array(
+						'turma' => $t,
+						'curso' => $curso_snapshot,
+						'feriados' => self::feriados_da_unidade( $prep['catalogo'], $t['unidadeId'] ),
+						'unidade' => $unidade_snapshot,
+						'versao' => isset( $t['versao'] ) ? (int) $t['versao'] : 1,
+					);
+					Cronograma_EAD_DB::salvar_versao(
+						$t['id'],
+						isset( $t['vigente']['versao'] ) ? (int) $t['vigente']['versao'] : ( isset( $t['versao'] ) ? (int) $t['versao'] : 1 ),
+						$snapshot,
+						get_current_user_id(),
+						isset( $t['vigente']['por'] ) ? (string) $t['vigente']['por'] : 'Backup restaurado',
+						isset( $t['vigente']['ressalva'] ) ? (string) $t['vigente']['ressalva'] : ''
+					);
+				}
+			}
+		} else {
+			foreach ( $prep['turmas'] as $t ) {
+				$row = Cronograma_EAD_DB::get( $t['id'] );
+				if ( ! $row ) {
+					if ( ! Cronograma_EAD_DB::inserir( $t, Cronograma_EAD_Rules::S_ELABORACAO, get_current_user_id() ) ) {
+						Cronograma_EAD_DB::rollback();
+						return self::erro( 'importacao', 'Falha ao criar turma durante a importação. Nada foi alterado.', 500 );
+					}
+				} elseif ( in_array( $row->status, array( 'elaboracao', 'solicitado' ), true ) ) {
+					$novo = Cronograma_EAD_Rules::merge_equipe( self::decodificar( $row ), $t, self::ids_do_curso( $prep['catalogo'], $t['cursoId'] ) );
+					if ( ! Cronograma_EAD_DB::atualizar( $row->id, $row->rev, array( 'data' => $novo, 'unidade_id' => $t['unidadeId'] ), get_current_user_id() ) ) {
+						Cronograma_EAD_DB::rollback();
+						return self::erro( 'conflito', 'Uma turma mudou durante a importação. Nada foi alterado.', 409 );
+					}
 				}
 			}
 		}
@@ -815,7 +874,7 @@ class Cronograma_EAD_Service {
 			Cronograma_EAD_DB::rollback();
 			return self::erro( 'importacao', 'Não foi possível concluir a importação.', 500 );
 		}
-		Cronograma_EAD_DB::audit_admin( 'importar_backup', 'sistema', '', 'ok', array( 'criadas' => $prep['criadas'], 'atualizadas' => $prep['atualizadas'], 'ignoradas' => $prep['ignoradas'] ) );
+		Cronograma_EAD_DB::audit_admin( 'importar_backup', 'sistema', '', 'ok', array( 'modo' => ! empty( $prep['fullRestore'] ) ? 'restauracao_completa' : 'importacao_legada', 'criadas' => $prep['criadas'], 'atualizadas' => $prep['atualizadas'], 'ignoradas' => $prep['ignoradas'] ) );
 		return array( 'rev' => $saved['rev'], 'turmas' => $prep['criadas'] + $prep['atualizadas'], 'puladas' => $prep['ignoradas'], 'criadas' => $prep['criadas'], 'atualizadas' => $prep['atualizadas'], 'ignoradas' => $prep['ignoradas'] );
 	}
 
