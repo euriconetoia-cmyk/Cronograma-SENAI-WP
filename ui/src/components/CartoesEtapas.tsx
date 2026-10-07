@@ -48,13 +48,13 @@ export function CartoesEtapas({ G, t, curso, modulo, hoje, ruins, travado, setMo
                     <ul className="flex flex-col gap-2">
                       {enc.map((e, i) => {
                         const tipoIx = enc.slice(0, i + 1).filter(x => x.tipo === e.tipo).length
-                        const ruim = e.tipo === 'presencial' && it.tipo === 'uc' && ruins.has(`${it.id}:${tipoIx - 1}`)
+                        const ruim = it.tipo === 'uc' && ruins.has(`${e.tipo}:${it.id}:${tipoIx - 1}`)
                         return (
                           <li key={i} className="flex items-center gap-2">
                             <span className="w-16 shrink-0 text-xs text-muted-foreground">{tipoIx}º {e.tipo === 'sincrono' ? 'Sínc.' : 'Pres.'}</span>
                             {it.tipo === 'intro'
                               ? <span className="mono text-sm">{dia(e.d)} · {e.h}</span>
-                              : <input type="date" disabled={travado} value={e.d} aria-label={`Data do ${i + 1}º encontro de ${it.nome}`} aria-invalid={ruim || undefined} onChange={ev => setMomento(r, enc, i, { d: ev.target.value })}
+                              : <input type="date" disabled={travado} value={e.d} aria-label={`Data do ${tipoIx}º ${e.tipo === 'sincrono' ? 'momento síncrono' : 'encontro presencial'} de ${it.nome}`} aria-invalid={ruim || undefined} onChange={ev => setMomento(r, enc, i, { d: ev.target.value })}
                                   className={`field-input mono min-h-[44px] flex-1 ${ruim ? '!border-destructive !bg-bad-soft font-bold !text-destructive ring-2 ring-destructive' : ''}`} />}
                             {ruim && <TriangleAlert size={18} className="shrink-0 text-destructive" aria-label="Data com problema" />}
                           </li>
