@@ -22,6 +22,8 @@ jobs:
       - name: Build WordPress frontend
         working-directory: ui
         run: pnpm build:wp
+      - name: Install generated WordPress bundle
+        run: cp ui/dist-wp/app.js plugin-cronograma-ead-core/assets/app.js
       - name: PHP syntax check
         run: bash tests/php-syntax.sh
       - name: Calendar contracts
