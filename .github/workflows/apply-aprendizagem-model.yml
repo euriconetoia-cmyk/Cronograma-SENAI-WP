@@ -1,0 +1,30 @@
+name: Apply aprendizagem model patch
+on:
+  push:
+    branches:
+      - release/2.20.0-rc1
+    paths:
+      - '.bootstrap/aprendizagem.patch.b64'
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply aprendizagem attendance model
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d .bootstrap/aprendizagem.patch.b64 | gzip -d > /tmp/aprendizagem.patch
+          patch -p1 --forward --batch < /tmp/aprendizagem.patch
+          rm -rf .bootstrap
+          rm -f .github/workflows/apply-aprendizagem-model.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "feat: model aprendizagem attendance phases and synchronous classes"
+          git push origin HEAD:release/2.20.0-rc1
