@@ -146,7 +146,7 @@ function CronogramaAberto() {
   const verNaTabela = (item: string, ix: number, tipo: 'presencial' | 'sincrono') => {
     const nome = G.by[item]?.it.nome
     setAba('cronograma'); setVisao('tabela'); setModulo('todos')
-    const rotulo = tipo === 'sincrono' ? 'momento síncrono' : 'encontro'
+    const rotulo = tipo === 'sincrono' ? 'momento síncrono' : 'encontro presencial'
     setTimeout(() => {
       const el = root.el?.querySelector<HTMLElement>(`[aria-label="Data do ${ix + 1}º ${rotulo} de ${nome}"]`)
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
@@ -289,10 +289,8 @@ function CronogramaAberto() {
                   </span>
                   {(a.ref || a.campo) && (
                     <span className="flex shrink-0 gap-1.5">
-                      {!a.ref && <button type="button" onClick={() => irAoErro(a)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ir ao erro</button>}
-
-                      <button type="button" onClick={() => verNaTabela(a.ref!.item, a.ref!.ix, a.ref!.tipo)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ir ao erro</button>
-                      {!lAj && a.ref!.tipo === 'presencial' && <button type="button" onClick={() => corrigir(`presencial:${a.ref!.item}:${a.ref!.ix}`)} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
+                      <button type="button" onClick={() => irAoErro(a)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ir ao erro</button>
+                      {!lAj && a.ref?.tipo === 'presencial' && <button type="button" onClick={() => corrigir(`presencial:${a.ref.item}:${a.ref.ix}`)} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
                     </span>
                   )}
                 </li>
@@ -454,14 +452,16 @@ function CronogramaAberto() {
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full min-w-[760px] text-sm">
               <thead><tr className="border-b bg-secondary text-left"><th className="px-3 py-2">Unidade curricular</th><th className="px-3 py-2">Nº</th><th className="px-3 py-2">Data da webaula</th><th className="px-3 py-2">Dia</th><th className="px-3 py-2">Horário</th><th className="px-3 py-2">Fase</th></tr></thead>
-              <tbody>{linhas.length ? linhas.map(({ r, e, ix }) => <tr key={`${r.it.id}-web-${ix}`} className="border-b">
+              <tbody>{linhas.length ? linhas.map(({ r, e, ix }) => {
+                const ruimWeb = ruins.has(`sincrono:${r.it.id}:${ix}`)
+                return <tr key={`${r.it.id}-web-${ix}`} className="border-b">
                 <td className="px-3 py-2 font-medium">{r.it.nome}</td>
                 <td className="mono px-3 py-2">{ix + 1}º</td>
-                <td className="px-2 py-1"><input type="date" disabled={lAj} className="cell-input mono w-[145px]" value={e.d} onChange={ev => setSin(r, ix, { d: ev.target.value })} /></td>
+                <td className={`px-2 py-1 ${ruimWeb ? 'bg-bad-soft' : ''}`}><input type="date" disabled={lAj} aria-invalid={ruimWeb || undefined} aria-label={`Data do ${ix + 1}º momento síncrono de ${r.it.nome}`} title={ruimWeb ? 'Esta data está fora das regras do cronograma. Veja em Verificações.' : undefined} className={`cell-input mono w-[145px] ${ruimWeb ? '!font-bold !text-destructive ring-2 ring-destructive' : ''}`} value={e.d} onChange={ev => setSin(r, ix, { d: ev.target.value })} /></td>
                 <td className="px-3 py-2">{e.d ? ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][dow(toN(e.d))] : '—'}</td>
                 <td className="px-2 py-1"><input disabled={lAj} className="cell-input min-w-[155px]" value={e.h} onChange={ev => setSin(r, ix, { h: ev.target.value })} /></td>
                 <td className="px-3 py-2">{e.d && fimIntensivo && e.d <= fimIntensivo ? 'Intensiva' : 'Semanal'}</td>
-              </tr>) : <tr><td colSpan={6} className="px-3 py-5 text-center text-muted-foreground">Informe a data de início da turma para gerar as webaulas.</td></tr>}</tbody>
+              </tr>}) : <tr><td colSpan={6} className="px-3 py-5 text-center text-muted-foreground">Informe a data de início da turma para gerar as webaulas.</td></tr>}</tbody>
             </table>
           </div>
           <p className="text-xs text-muted-foreground">As datas são recalculadas automaticamente quando o início da turma, os feriados ou a regra de atendimento do curso mudam. Datas alteradas manualmente são preservadas até um recálculo completo.</p>
