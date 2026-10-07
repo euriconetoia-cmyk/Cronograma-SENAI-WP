@@ -13,6 +13,10 @@ export interface Api {
   boot(): Promise<Boot>
   saveCatalogo(data: Catalogo, rev: number): Promise<{ rev: number }>
   feriadosNacionais(ano: number): Promise<{ ano: number; feriados: [string, string][]; cache: boolean }>
+  municipios(uf: string): Promise<{ uf: string; municipios: { nome: string; codigoIbge: string }[]; cache: boolean }>
+  feriadosLocal(unidadeId: string, ano: number): Promise<{ unidadeId: string; ano: number; localidade: { cidade: string; uf: string; codigoIbge: string }; feriados: [string, string, 'estadual' | 'municipal', string][]; municipalConfigurado: boolean; avisos: string[] }>
+  feriadosConfig(): Promise<{ municipalConfigurado: boolean }>
+  salvarFeriadosConfig(apiKey: string): Promise<{ municipalConfigurado: boolean }>
   criar(turma: Partial<Turma> & { id: string }): Promise<Turma>
   salvar(id: string, turma: Turma, rev: number, motivo?: string): Promise<Turma>
   acao(id: string, body: AcaoBody): Promise<Turma>
@@ -61,6 +65,10 @@ export function realApi(c: Config): Api {
     boot: () => call('GET', 'bootstrap'),
     saveCatalogo: (data, rev) => call('POST', 'catalogo', { data, rev }),
     feriadosNacionais: ano => call('GET', `feriados/nacionais/${ano}`),
+    municipios: uf => call('GET', `localidades/municipios/${encodeURIComponent(uf)}`),
+    feriadosLocal: (unidadeId, ano) => call('GET', `feriados/local/${encodeURIComponent(unidadeId)}/${ano}`),
+    feriadosConfig: () => call('GET', 'feriados/config'),
+    salvarFeriadosConfig: apiKey => call('POST', 'feriados/config', { apiKey }),
     criar: turma => call('POST', 'turmas', { turma }),
     salvar: (id, turma, rev, motivo) => call('POST', `turmas/${id}`, { turma, rev, motivo }),
     acao: (id, body) => call('POST', `turmas/${id}/acao`, body),
