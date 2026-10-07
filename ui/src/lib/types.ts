@@ -28,6 +28,7 @@ export interface ItemTurma {
 export interface Vigente { versao: number; por: string; em: string; ressalva: string }
 export interface Turma {
   id: string; cursoId: string; nome: string; unidadeId: string; inicio: string; fimManual?: string; cursoSolicitado?: string; evento: string
+  personalizarCronograma?: boolean; configuracaoCronograma?: ConfiguracaoCronograma
   monitorId: string; tutorId: string; coordId: string; profId: string; ambiente: string; obs?: string
   itens: Record<string, ItemTurma>
   status: Status; versao: number; rev: number; prazo: string; vigente: Vigente | null
