@@ -337,7 +337,20 @@ class Cronograma_EAD_Store {
 		return is_array( $data ) ? $data : null;
 	}
 
+	public static function limpar_cursos() {
+		$cur = self::get();
+		$data = $cur['data'];
+		$data['cursos'] = array();
+		update_option( self::OPT_DATA, wp_json_encode( $data ), false );
+		update_option( self::OPT_REV, (int) $cur['rev'] + 1, false );
+		update_option( 'cronograma_ead_seed_bloqueado', 1, false );
+		return true;
+	}
+
 	public static function seed_if_empty() {
+		if ( get_option( 'cronograma_ead_seed_bloqueado' ) ) {
+			return;
+		}
 		$cur = self::get();
 		if ( empty( $cur['data']['cursos'] ) && 0 === Cronograma_EAD_DB::contar() ) {
 			self::seed();
