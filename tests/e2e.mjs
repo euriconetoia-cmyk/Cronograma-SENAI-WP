@@ -57,6 +57,7 @@ const extra=await U.admin.s.api('POST','turmas',{turma:{id:EXTRA,cursoId,unidade
 ok(extra.status===200||extra.status===201,'cria turma depois do backup ('+extra.status+')')
 const beforeRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
 const sim=await U.admin.s.api('POST','importar',{...ex.j,simular:true},U.admin.n)
+if(sim.status!==200) console.log('erro simulação backup:',JSON.stringify(sim.j))
 ok(sim.status===200&&sim.j?.simulacao===true&&typeof sim.j?.confirmacao==='string','simula restauração completa ('+sim.status+')')
 const restored=await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev,confirmacao:sim.j.confirmacao,simular:false},U.admin.n)
 ok(restored.status===200,'restauração completa executa ('+restored.status+')')
