@@ -214,6 +214,29 @@ class Cronograma_EAD_Store {
 				return new WP_Error( 'cronograma_ead_invalido', "Data inválida em $k (use AAAA-MM-DD).", array( 'status' => 400 ) );
 			}
 		}
+		if ( isset( $input['status'] ) && in_array( (string) $input['status'], array( 'solicitado', 'elaboracao', 'validacao', 'validado', 'arquivado' ), true ) ) {
+			$t['status'] = (string) $input['status'];
+		}
+		if ( isset( $input['versao'] ) ) {
+			$t['versao'] = max( 1, (int) $input['versao'] );
+		}
+		if ( isset( $input['rev'] ) ) {
+			$t['rev'] = max( 1, (int) $input['rev'] );
+		}
+		if ( isset( $input['prazo'] ) && '' !== (string) $input['prazo'] ) {
+			$prazo = sanitize_text_field( (string) $input['prazo'] );
+			if ( ! Cronograma_EAD_Rules::data_ok( $prazo ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Prazo inválido na turma.', array( 'status' => 400 ) );
+			}
+			$t['prazo'] = $prazo;
+		} elseif ( array_key_exists( 'prazo', $input ) ) {
+			$t['prazo'] = '';
+		}
+		if ( isset( $input['vigente'] ) && is_array( $input['vigente'] ) ) {
+			$t['vigente'] = self::clean( $input['vigente'] );
+		} elseif ( array_key_exists( 'vigente', $input ) ) {
+			$t['vigente'] = null;
+		}
 		$t['personalizarCronograma'] = ! empty( $input['personalizarCronograma'] );
 		if ( isset( $input['configuracaoCronograma'] ) ) {
 			if ( ! is_array( $input['configuracaoCronograma'] ) ) {
