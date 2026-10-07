@@ -143,10 +143,27 @@ function CronogramaAberto() {
   const R = curso.regras
   // Datas com problema: corrige automaticamente (todas ou só uma) e leva o olhar até a data na tabela.
   const corrigir = (so?: string) => update(x => { const tt = x.turmas.find(a => a.id === t.id)!; for (const [id, enc] of Object.entries(corrigirEncontros(t, G, d.feriados, ruins, so))) tt.itens[id] = { ...(tt.itens[id] || {}), enc } })
-  const verNaTabela = (item: string, ix: number) => {
+  const verNaTabela = (item: string, ix: number, tipo: 'presencial' | 'sincrono') => {
     const nome = G.by[item]?.it.nome
     setAba('cronograma'); setVisao('tabela'); setModulo('todos')
-    setTimeout(() => { const el = root.el?.querySelector<HTMLElement>(`[aria-label="Data do ${ix + 1}º encontro de ${nome}"]`); el?.scrollIntoView({ block: 'center', behavior: 'smooth' }); el?.focus({ preventScroll: true }) }, 120)
+    const rotulo = tipo === 'sincrono' ? 'momento síncrono' : 'encontro'
+    setTimeout(() => {
+      const el = root.el?.querySelector<HTMLElement>(`[aria-label="Data do ${ix + 1}º ${rotulo} de ${nome}"]`)
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el?.focus({ preventScroll: true })
+    }, 120)
+  }
+  const irAoErro = (a: typeof avisos[number]) => {
+    if (a.ref) return verNaTabela(a.ref.item, a.ref.ix, a.ref.tipo)
+    if (a.campo === 'inicio' || a.campo === 'fim') {
+      setAba('dados')
+      setTimeout(() => {
+        const seletor = a.campo === 'inicio' ? '[aria-label="Início da turma"]' : '[aria-label="Término previsto"]'
+        const el = root.el?.querySelector<HTMLElement>(seletor)
+        el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        el?.focus({ preventScroll: true })
+      }, 120)
+    }
   }
   if (t.status === 'solicitado' || curso.resumo) {
     return (
@@ -258,7 +275,7 @@ function CronogramaAberto() {
           {problemas.length ? <AlertTriangle size={16} className="text-warn" /> : <CheckCircle2 size={16} className="text-ok" />}
           <h2 className="font-heading text-sm font-semibold">{T.cron.verif.titulo}</h2>
           <span className={`rounded-full px-2 py-0.5 text-xs ${problemas.length ? 'bg-warn-soft text-warn' : 'bg-ok-soft text-ok'}`}>{problemas.length ? T.cron.verif.alertas(problemas.length) : T.cron.verif.tudoCerto}</span>
-          {ruins.size > 0 && !lAj && <button type="button" onClick={() => corrigir()} className="ml-auto rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110">Corrigir {ruins.size === 1 ? 'a data' : `as ${ruins.size} datas`} automaticamente</button>}
+          {[...ruins].some(k => k.startsWith('presencial:')) && !lAj && <button type="button" onClick={() => corrigir()} className="ml-auto rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110">Corrigir datas presenciais automaticamente</button>}
           {ruins.size > 0 && lAj && <span className="ml-auto text-xs text-muted-foreground">Datas em vermelho: só quem pode editar este cronograma consegue corrigir.</span>}
         </div>
         <ul className="flex flex-col gap-1.5 border-t px-4 py-3">
@@ -270,10 +287,12 @@ function CronogramaAberto() {
                   <span className="min-w-0 flex-1"><b className="font-heading uppercase tracking-wide text-[11px]">{a.area}</b>{' '}
                     {partes.map((p, k) => <span key={k}>{k > 0 && <b className="rounded bg-destructive px-1 py-px font-bold text-destructive-foreground">{a.dt}</b>}{p}</span>)}
                   </span>
-                  {a.ref && (
+                  {(a.ref || a.campo) && (
                     <span className="flex shrink-0 gap-1.5">
-                      <button type="button" onClick={() => verNaTabela(a.ref!.item, a.ref!.ix)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ver na tabela</button>
-                      {!lAj && <button type="button" onClick={() => corrigir(`${a.ref!.item}:${a.ref!.ix}`)} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
+                      {!a.ref && <button type="button" onClick={() => irAoErro(a)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ir ao erro</button>}
+
+                      <button type="button" onClick={() => verNaTabela(a.ref!.item, a.ref!.ix, a.ref!.tipo)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ir ao erro</button>
+                      {!lAj && a.ref!.tipo === 'presencial' && <button type="button" onClick={() => corrigir(`presencial:${a.ref!.item}:${a.ref!.ix}`)} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
                     </span>
                   )}
                 </li>
@@ -358,7 +377,7 @@ function CronogramaAberto() {
                     return Array.from({ length: span }).map((_, i) => {
                       const e = mom[i] ?? ({ d: '', h: R.horario, w: R.webHora, tipo: 'presencial' } as MomentoInstrucional), semEnc = !mom[i]
                       const tipoIx = mom.slice(0, i + 1).filter(x => x.tipo === e.tipo).length
-                      const ruim = e.tipo === 'presencial' && it.tipo === 'uc' && ruins.has(`${it.id}:${tipoIx - 1}`)
+                      const ruim = it.tipo === 'uc' && ruins.has(`${e.tipo}:${it.id}:${tipoIx - 1}`)
                       return (
                         <tr key={`${it.id}-${i}`}>
                           {i === 0 && (
