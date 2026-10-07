@@ -759,6 +759,147 @@ class Cronograma_EAD_Service {
 		return array( 'ano' => $ano, 'feriados' => $out, 'cache' => false, 'fonte' => $fonte );
 	}
 
+	/** Municípios oficiais de uma UF, com código IBGE. */
+	public static function municipios_uf( $uf ) {
+		$uf = strtoupper( sanitize_text_field( (string) $uf ) );
+		$ufs = array( 'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO' );
+		if ( ! in_array( $uf, $ufs, true ) ) {
+			return self::erro( 'uf', 'UF inválida para consulta de municípios.', 400 );
+		}
+		$key = 'cronograma_ead_municipios_' . strtolower( $uf );
+		$cached = get_transient( $key );
+		if ( is_array( $cached ) ) {
+			return array( 'uf' => $uf, 'municipios' => $cached, 'cache' => true );
+		}
+		$url = 'https://brasilapi.com.br/api/ibge/municipios/v1/' . rawurlencode( $uf );
+		$res = wp_safe_remote_get( $url, array( 'timeout' => 10, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
+		if ( is_wp_error( $res ) || 200 !== (int) wp_remote_retrieve_response_code( $res ) ) {
+			return self::erro( 'municipios_indisponiveis', 'Não foi possível consultar os municípios agora.', 502 );
+		}
+		$body = json_decode( wp_remote_retrieve_body( $res ), true );
+		$out = array();
+		foreach ( (array) $body as $m ) {
+			if ( ! is_array( $m ) ) continue;
+			$nome = isset( $m['nome'] ) ? sanitize_text_field( (string) $m['nome'] ) : '';
+			$codigo = isset( $m['codigo_ibge'] ) ? preg_replace( '/\D+/', '', (string) $m['codigo_ibge'] ) : ( isset( $m['id'] ) ? preg_replace( '/\D+/', '', (string) $m['id'] ) : '' );
+			if ( $nome && preg_match( '/^\d{7}$/', $codigo ) ) {
+				$out[] = array( 'nome' => $nome, 'codigoIbge' => $codigo );
+			}
+		}
+		usort( $out, function( $a, $b ) { return strcasecmp( $a['nome'], $b['nome'] ); } );
+		set_transient( $key, $out, 30 * DAY_IN_SECONDS );
+		return array( 'uf' => $uf, 'municipios' => $out, 'cache' => false );
+	}
+
+	public static function feriados_config() {
+		return array( 'municipalConfigurado' => '' !== trim( (string) get_option( 'cronograma_ead_feriados_api_key', '' ) ) );
+	}
+
+	public static function feriados_config_salvar( $body ) {
+		$key = isset( $body['apiKey'] ) ? sanitize_text_field( (string) $body['apiKey'] ) : '';
+		if ( strlen( $key ) > 190 ) {
+			return self::erro( 'api_key', 'Chave da API de feriados inválida.', 400 );
+		}
+		update_option( 'cronograma_ead_feriados_api_key', $key, false );
+		Cronograma_EAD_DB::audit_admin( 'config_feriados_municipais', 'config', '', $key ? 'configurado' : 'removido' );
+		return array( 'municipalConfigurado' => '' !== $key );
+	}
+
+	private static function normalizar_nome_localidade( $s ) {
+		$s = remove_accents( strtolower( trim( (string) $s ) ) );
+		return preg_replace( '/[^a-z0-9]+/', '', $s );
+	}
+
+	/** Resolve o código IBGE pelo par cidade + UF quando a unidade ainda não o possui. */
+	private static function resolver_ibge_unidade( $unidade ) {
+		$codigo = isset( $unidade['codigoIbge'] ) ? preg_replace( '/\D+/', '', (string) $unidade['codigoIbge'] ) : '';
+		if ( preg_match( '/^\d{7}$/', $codigo ) ) return $codigo;
+		$uf = isset( $unidade['estado'] ) ? strtoupper( (string) $unidade['estado'] ) : '';
+		$cidade = isset( $unidade['cidade'] ) ? (string) $unidade['cidade'] : '';
+		if ( ! $uf || ! $cidade ) return '';
+		$r = self::municipios_uf( $uf );
+		if ( is_wp_error( $r ) ) return '';
+		$alvo = self::normalizar_nome_localidade( $cidade );
+		foreach ( $r['municipios'] as $m ) {
+			if ( self::normalizar_nome_localidade( $m['nome'] ) === $alvo ) return $m['codigoIbge'];
+		}
+		return '';
+	}
+
+	/** Calendário estadual + municipal da unidade. Nacionais continuam no calendário geral. */
+	public static function feriados_local( $unidade_id, $ano ) {
+		$ano = (int) $ano;
+		if ( $ano < 1900 || $ano > 2199 ) return self::erro( 'ano', 'Ano inválido.', 400 );
+		$cat = Cronograma_EAD_Store::get();
+		$unidade = null;
+		foreach ( $cat['data']['unidades'] as $u ) {
+			if ( isset( $u['id'] ) && (string) $u['id'] === (string) $unidade_id ) { $unidade = $u; break; }
+		}
+		if ( ! $unidade ) return self::erro( 'unidade', 'Unidade não encontrada.', 404 );
+		$uf = isset( $unidade['estado'] ) ? strtoupper( (string) $unidade['estado'] ) : '';
+		$cidade = isset( $unidade['cidade'] ) ? sanitize_text_field( (string) $unidade['cidade'] ) : '';
+		$ibge = self::resolver_ibge_unidade( $unidade );
+		if ( ! $uf || ! $cidade || ! $ibge ) return self::erro( 'localidade', 'Cadastre uma cidade e um estado válidos para a unidade.', 422 );
+
+		$cache_key = 'cronograma_ead_feriados_local_' . md5( $unidade_id . '|' . $ano . '|' . $uf . '|' . $ibge );
+		$cached = get_transient( $cache_key );
+		if ( is_array( $cached ) ) return $cached;
+
+		$out = array();
+		$avisos = array();
+		$nacionais = self::feriados_nacionais( $ano );
+		$datas_nacionais = array();
+		if ( ! is_wp_error( $nacionais ) ) foreach ( $nacionais['feriados'] as $h ) $datas_nacionais[ $h[0] ] = true;
+
+		// BrasilAPI: nacionais + estaduais da UF. Mantemos apenas os extras estaduais.
+		$url_estado = add_query_arg( 'uf', $uf, 'https://brasilapi.com.br/api/feriados/v1/' . $ano );
+		$res = wp_safe_remote_get( $url_estado, array( 'timeout' => 10, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
+		if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
+			foreach ( (array) json_decode( wp_remote_retrieve_body( $res ), true ) as $item ) {
+				$data = isset( $item['date'] ) ? sanitize_text_field( (string) $item['date'] ) : '';
+				$nome = isset( $item['name'] ) ? sanitize_text_field( (string) $item['name'] ) : 'Feriado estadual';
+				if ( Cronograma_EAD_Rules::data_ok( $data ) && ! isset( $datas_nacionais[ $data ] ) ) $out[] = array( $data, $nome, 'estadual', 'BrasilAPI' );
+			}
+		} else {
+			$avisos[] = 'Não foi possível atualizar os feriados estaduais agora.';
+		}
+
+		$api_key = trim( (string) get_option( 'cronograma_ead_feriados_api_key', '' ) );
+		if ( $api_key ) {
+			$url_mun = add_query_arg( 'ano', $ano, 'https://feriadosapi.com/api/v1/feriados/cidade/' . rawurlencode( $ibge ) );
+			$resm = wp_safe_remote_get( $url_mun, array( 'timeout' => 12, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json', 'X-API-Key' => $api_key ) ) );
+			if ( ! is_wp_error( $resm ) && 200 === (int) wp_remote_retrieve_response_code( $resm ) ) {
+				foreach ( (array) json_decode( wp_remote_retrieve_body( $resm ), true ) as $item ) {
+					$raw = isset( $item['data'] ) ? sanitize_text_field( (string) $item['data'] ) : '';
+					$data = $raw;
+					if ( preg_match( '/^(\d{2})\/(\d{2})\/(\d{4})$/', $raw, $m ) ) $data = $m[3] . '-' . $m[2] . '-' . $m[1];
+					$nome = isset( $item['nome'] ) ? sanitize_text_field( (string) $item['nome'] ) : 'Feriado municipal';
+					$tipo = isset( $item['tipo'] ) ? strtoupper( sanitize_text_field( (string) $item['tipo'] ) ) : 'MUNICIPAL';
+					if ( Cronograma_EAD_Rules::data_ok( $data ) && 'MUNICIPAL' === $tipo ) $out[] = array( $data, $nome, 'municipal', 'Feriados API' );
+				}
+			} else {
+				$avisos[] = 'A fonte de feriados municipais não respondeu para esta localidade.';
+			}
+		} else {
+			$avisos[] = 'Feriados municipais ainda não estão habilitados: configure a chave da Feriados API.';
+		}
+		// Remove duplicados por data+tipo+nome.
+		$uniq = array();
+		foreach ( $out as $h ) $uniq[ implode( '|', array( $h[0], $h[2], $h[1] ) ) ] = $h;
+		$out = array_values( $uniq );
+		usort( $out, function( $a, $b ) { return strcmp( $a[0], $b[0] ); } );
+		$ret = array(
+			'unidadeId' => (string) $unidade_id,
+			'ano' => $ano,
+			'localidade' => array( 'cidade' => $cidade, 'uf' => $uf, 'codigoIbge' => $ibge ),
+			'feriados' => $out,
+			'municipalConfigurado' => '' !== $api_key,
+			'avisos' => $avisos,
+		);
+		set_transient( $cache_key, $ret, 7 * DAY_IN_SECONDS );
+		return $ret;
+	}
+
 	/** Sincroniza automaticamente o ano atual e o próximo no catálogo institucional. */
 	private static function sincronizar_feriados_automaticos() {
 		if ( get_transient( 'cronograma_ead_auto_feriados_ok' ) ) {
