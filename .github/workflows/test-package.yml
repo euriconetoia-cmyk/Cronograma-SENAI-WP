@@ -43,7 +43,7 @@ jobs:
       - name: Validate generated bundle
         run: |
           test -s plugin-cronograma-ead-core/assets/app.js
-          grep -q "2.20.0" plugin-cronograma-ead-core/cronograma-ead-core.php
+          grep -q "2.21.0" plugin-cronograma-ead-core/cronograma-ead-core.php
       - name: Build WordPress test ZIPs
         shell: bash
         run: |
