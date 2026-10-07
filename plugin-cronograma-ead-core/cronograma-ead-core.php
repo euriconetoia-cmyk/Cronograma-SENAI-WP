@@ -46,6 +46,7 @@ final class Cronograma_EAD_Plugin {
 		add_action( 'admin_menu', array( 'Cronograma_EAD_Admin', 'menu' ) );
 		add_action( 'admin_post_cronograma_ead_pages', array( 'Cronograma_EAD_Admin', 'handle_pages' ) );
 		add_action( 'admin_post_cronograma_ead_seed', array( 'Cronograma_EAD_Admin', 'handle_seed' ) );
+		add_action( 'admin_post_cronograma_ead_reset_teste', array( 'Cronograma_EAD_Admin', 'handle_reset_teste' ) );
 		add_action( 'admin_post_cronograma_ead_export', array( 'Cronograma_EAD_Admin', 'handle_export' ) );
 		add_action( 'admin_post_cronograma_ead_settings', array( 'Cronograma_EAD_Admin', 'handle_settings' ) );
 		add_action( 'admin_notices', function () {
