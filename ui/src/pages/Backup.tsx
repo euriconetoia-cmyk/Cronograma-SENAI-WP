@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Download } from 'lucide-react'
+import { Download, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Confirm, Panel } from '@/components/Fields'
 import { baixar } from '@/lib/export'
@@ -46,17 +46,18 @@ export function BackupPage() {
   return (
     <div className="flex max-w-3xl flex-col gap-4">
       <Panel title={T.backup.titulo}>
-        <p className="mb-4 max-w-prose text-sm text-muted-foreground">{T.backup.ajuda}</p>
+        <p className="mb-2 max-w-prose text-sm text-muted-foreground">{T.backup.ajuda}</p>
+        <div className="mb-4 flex max-w-prose gap-2 rounded-md bg-secondary px-3 py-2 text-xs text-muted-foreground"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-primary" /><span>Ao restaurar um backup novo, o sistema volta ao estado salvo no arquivo. Antes disso, uma cópia automática do estado atual é guardada para segurança.</span></div>
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => void baixarCopia()} disabled={busy}><Download size={15} />{T.backup.baixar}</Button>
           <label className="inline-flex h-10 cursor-pointer items-center rounded-md border px-4 text-sm font-medium hover:bg-accent">{T.backup.escolher}<input type="file" hidden accept=".json,application/json" onChange={e => ler(e.target.files?.[0])} /></label>
           {arquivo && <span className="mono text-xs text-muted-foreground">{arquivo}</span>}
           <Button variant="outline" disabled={!copia || busy} onClick={() => setConf(true)}>{T.backup.carregar}</Button>
         </div>
-        {sim && <p role="status" className="mt-3 rounded-md bg-secondary px-3 py-2 text-sm">Simulação concluída: {sim.criadas} turma(s) nova(s), {sim.atualizadas} atualização(ões) e {sim.ignoradas} ignorada(s). Nenhum dado foi alterado.</p>}
+        {sim && <p role="status" className="mt-3 rounded-md bg-secondary px-3 py-2 text-sm">Simulação concluída: o backup contém {sim.criadas + sim.atualizadas + sim.ignoradas} turma(s); {sim.criadas} ainda não existem neste ambiente e {sim.atualizadas} possuem o mesmo identificador. {copia?.backupMode === 'full-state' ? 'A restauração substituirá o estado atual pelo conteúdo desta cópia.' : `${sim.ignoradas} serão ignoradas pelo formato legado.`} Nenhum dado foi alterado ainda.</p>}
         {erro && <p role="alert" className="mt-3 rounded-md bg-bad-soft px-3 py-2 text-sm text-destructive">{erro}</p>}
       </Panel>
-      <Confirm copy={conf ? T.backup.confirma : null} onClose={() => setConf(false)} onConfirm={() => void carregar()} />
+      <Confirm copy={conf ? (copia?.backupMode === 'full-state' ? { titulo: 'Restaurar este backup?', texto: 'Cursos, unidades, feriados e turmas serão substituídos pelo estado salvo neste arquivo. Uma cópia automática do estado atual será criada antes.', confirmar: 'Restaurar backup' } : T.backup.confirma) : null} onClose={() => setConf(false)} onConfirm={() => void carregar()} />
     </div>
   )
 }
