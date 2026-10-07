@@ -36,6 +36,7 @@ export const T = {
       acessos: { nome: 'Acessos', desc: 'Quem entra no sistema e com qual perfil' },
       unidades: { nome: 'Unidades', desc: 'Unidades escolares atendidas' },
       feriados: { nome: 'Feriados', desc: 'Dias sem aula usados no cálculo das datas' },
+      integracoes: { nome: 'Integrações', desc: 'Serviços externos e credenciais técnicas' },
       backup: { nome: 'Backup', desc: 'Exportar e restaurar os dados' },
     },
   },
