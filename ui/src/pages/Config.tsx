@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Building2, CalendarOff, ChevronLeft, ChevronRight, DatabaseBackup, KeyRound, UserCog, type LucideIcon } from 'lucide-react'
+import { Building2, CalendarOff, ChevronLeft, ChevronRight, DatabaseBackup, KeyRound, PlugZap, UserCog, type LucideIcon } from 'lucide-react'
 import { CONFIG_PAGES, useStore, type Page } from '@/lib/store'
 import { T } from '@/lib/texts'
 
-const ICONES: Partial<Record<Page, LucideIcon>> = { equipe: UserCog, acessos: KeyRound, unidades: Building2, feriados: CalendarOff, backup: DatabaseBackup }
+const ICONES: Partial<Record<Page, LucideIcon>> = { equipe: UserCog, acessos: KeyRound, unidades: Building2, feriados: CalendarOff, integracoes: PlugZap, backup: DatabaseBackup }
 
 /** Moldura das páginas de configuração: lista de seções à esquerda (em cima, no celular) e a página escolhida ao lado. */
 export function ConfigLayout({ children }: { children: ReactNode }) {
