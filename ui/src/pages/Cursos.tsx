@@ -25,7 +25,7 @@ export function CursosPage() {
   const mut = (fn: (c: Curso) => void) => update(x => { fn(x.cursos.find(a => a.id === c.id)!) })
 
   const novo = () => {
-    const n: Curso = { id: uid('c'), nome: 'Novo curso', categoria: '', modalidade: '', modeloCronograma: 'qualificacao', chTotal: 0, nota: '', regras: { hEncontro: 8, webDias: 10, webHora: '15h', postDias: 3, horario: '08:00h às 17:00h' }, modulos: [{ id: uid('m'), nome: 'Módulo 1', itens: [] }] }
+    const n: Curso = { id: uid('c'), nome: 'Novo curso', categoria: '', modalidade: 'ead', modeloCronograma: 'qualificacao', chTotal: 0, nota: '', regras: { hEncontro: 8, webDias: 10, webHora: '15h', postDias: 3, horario: '08:00h às 17:00h' }, modulos: [{ id: uid('m'), nome: 'Módulo 1', itens: [] }] }
     update(x => { x.cursos.push(n) }); setCursoId(n.id)
   }
   const duplicar = () => { const n: Curso = JSON.parse(JSON.stringify(c)); n.id = uid('c'); n.nome = `${c.nome} (cópia)`; n.modulos.forEach(m => { m.id = uid('m'); m.itens.forEach(i => { i.id = uid('i') }) }); update(x => { x.cursos.push(n) }); setCursoId(n.id); toast('Curso duplicado.') }
@@ -65,7 +65,6 @@ export function CursosPage() {
               {T.categoriaGrupos.map(g => <optgroup key={g.nome} label={g.nome}>{g.itens.map(k => <option key={k} value={k}>{T.categoria[k].nome}</option>)}</optgroup>)}
             </select></Field>
             <Field label="Modalidade (como é oferecido)"><select className="field-input" value={c.modalidade ?? ''} onChange={e => mut(k => { k.modalidade = e.target.value as Curso['modalidade'] })}>
-              <option value="">Não informada</option>
               {Object.entries(T.modalidadeLonga).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select></Field>
             <Field label="Modelo do cronograma"><select className="field-input" value={c.modeloCronograma ?? 'qualificacao'} onChange={e => mut(k => { k.modeloCronograma = e.target.value as ModeloCronograma })}>
