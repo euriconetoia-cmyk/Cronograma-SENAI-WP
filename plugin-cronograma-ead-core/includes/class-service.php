@@ -901,7 +901,7 @@ class Cronograma_EAD_Service {
 
 	/** Simula ou executa uma importação de forma atômica. */
 	public static function importar( $body ) {
-		$rate = Cronograma_EAD_Security::rate_limit( 'importar', '', 5, HOUR_IN_SECONDS );
+		$rate = Cronograma_EAD_Security::rate_limit( 'importar', '', 20, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
 		}
