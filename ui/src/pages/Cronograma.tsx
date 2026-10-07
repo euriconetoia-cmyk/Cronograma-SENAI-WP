@@ -11,7 +11,7 @@ import { abaPedida, pedidoAberto } from '@/lib/avisos'
 import { root } from '@/lib/root'
 import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
-import { compute, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
+import { compute, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, fimFaseIntensivaAprendizagem, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
 import { quando } from '@/lib/format'
 import type { ExportEntrada } from '@/lib/export'
 import type { Encontro, ItemTurma } from '@/lib/types'
@@ -53,7 +53,7 @@ function CronogramaAberto() {
   const [visao, setVisao] = useState<'tabela' | 'linha'>('tabela')
   const [grupos, setGrupos] = useState<Record<Grupo, boolean>>({ equipe: true, encontros: true, presencial: true, suporte: false })
   const [modulo, setModulo] = useState('todos')
-  const [aba, setAba] = useState<'cronograma' | 'dados' | 'verif' | 'hist' | 'msgs'>(() => { const a = abaPedida.v; abaPedida.v = ''; return a === 'msgs' ? 'msgs' : 'cronograma' })
+  const [aba, setAba] = useState<'cronograma' | 'webaulas' | 'dados' | 'verif' | 'hist' | 'msgs'>(() => { const a = abaPedida.v; abaPedida.v = ''; return a === 'msgs' ? 'msgs' : 'cronograma' })
   const hoje = todayStr()
   useEffect(() => { if (turmaId) lembrarTurma(turmaId) }, [turmaId])
   // Clique no sino (ou em "Ver conversa") pode pedir uma aba.
@@ -198,7 +198,7 @@ function CronogramaAberto() {
       {!t.inicio && <div className="rounded-md border border-warn/40 bg-warn-soft px-3 py-2 text-sm text-warn">{T.cron.semInicio}</div>}
 
       <div role="tablist" aria-label="Seções do cronograma" className="flex gap-1 overflow-x-auto border-b-2">
-        {([['cronograma', 'Cronograma'], ['dados', 'Dados da turma'], ['verif', 'Verificações'], ['msgs', 'Mensagens'], ['hist', 'Histórico']] as const).map(([id, nome]) => (
+        {([['cronograma', 'Cronograma'], ...(curso.modeloCronograma === 'aprendizagem' ? [['webaulas', 'Webaulas síncronas']] as const : []), ['dados', 'Dados da turma'], ['verif', 'Verificações'], ['msgs', 'Mensagens'], ['hist', 'Histórico']] as const).map(([id, nome]) => (
           <button key={id} type="button" role="tab" aria-selected={aba === id} onClick={() => setAba(id)}
             className={`-mb-0.5 whitespace-nowrap border-b-[3px] px-4 py-2.5 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary ${aba === id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>
             {nome}
@@ -419,6 +419,33 @@ function CronogramaAberto() {
       <p className="text-xs text-muted-foreground">{T.cron.legenda}</p>
       {curso.nota && <p className="text-xs text-muted-foreground">{curso.nota}</p>}
       </>)}
+
+
+      {aba === 'webaulas' && curso.modeloCronograma === 'aprendizagem' && (() => {
+        const hol = new Set(feriadosDaTurma(t, d.feriados).map(f => f[0]))
+        const fimIntensivo = t.inicio ? fimFaseIntensivaAprendizagem(t.inicio, curso, hol) : null
+        const linhas = G.rows.filter(r => r.it.tipo === 'uc').flatMap(r => sincronicos(t, r, curso).map((e, ix) => ({ r, e, ix })))
+        return <div className="flex flex-col gap-3">
+          <div className="rounded-lg border bg-card p-4">
+            <h2 className="font-heading text-base font-semibold">Regra de atendimento da Aprendizagem</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Fase intensiva: atendimento nos dias úteis configurados desde o início da turma{fimIntensivo ? <> até <b className="mono">{fmt(fimIntensivo)}</b></> : ''}. Depois, o sistema mantém somente os dias semanais definidos no cadastro do curso.</p>
+          </div>
+          <div className="overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead><tr className="border-b bg-secondary text-left"><th className="px-3 py-2">Unidade curricular</th><th className="px-3 py-2">Nº</th><th className="px-3 py-2">Data da webaula</th><th className="px-3 py-2">Dia</th><th className="px-3 py-2">Horário</th><th className="px-3 py-2">Fase</th></tr></thead>
+              <tbody>{linhas.length ? linhas.map(({ r, e, ix }) => <tr key={`${r.it.id}-web-${ix}`} className="border-b">
+                <td className="px-3 py-2 font-medium">{r.it.nome}</td>
+                <td className="mono px-3 py-2">{ix + 1}º</td>
+                <td className="px-2 py-1"><input type="date" disabled={lAj} className="cell-input mono w-[145px]" value={e.d} onChange={ev => setSin(r, ix, { d: ev.target.value })} /></td>
+                <td className="px-3 py-2">{e.d ? ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][dow(toN(e.d))] : '—'}</td>
+                <td className="px-2 py-1"><input disabled={lAj} className="cell-input min-w-[155px]" value={e.h} onChange={ev => setSin(r, ix, { h: ev.target.value })} /></td>
+                <td className="px-3 py-2">{e.d && fimIntensivo && e.d <= fimIntensivo ? 'Intensiva' : 'Semanal'}</td>
+              </tr>) : <tr><td colSpan={6} className="px-3 py-5 text-center text-muted-foreground">Informe a data de início da turma para gerar as webaulas.</td></tr>}</tbody>
+            </table>
+          </div>
+          <p className="text-xs text-muted-foreground">As datas são recalculadas automaticamente quando o início da turma, os feriados ou a regra de atendimento do curso mudam. Datas alteradas manualmente são preservadas até um recálculo completo.</p>
+        </div>
+      })()}
 
       {aba === 'msgs' && <AbaMensagens t={t} />}
 

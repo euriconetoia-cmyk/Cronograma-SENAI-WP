@@ -11,6 +11,14 @@ export interface RegraEventoPerfil {
   horario?: string
 }
 
+export interface ConfiguracaoAprendizagemResolvida {
+  faseIntensivaDiasUteis: number
+  diasIntensivos: number[]
+  diasAtendimentoRegular: number[]
+  horarioWebaula?: string
+  duracaoWebaulaHoras: number
+}
+
 export interface PerfilCronogramaResolvido {
   modelo: ModeloCronograma
   cargaDiaria?: number
@@ -18,6 +26,7 @@ export interface PerfilCronogramaResolvido {
   presencial: RegraEventoPerfil
   sincrono: RegraEventoPerfil
   praticaProfissional: boolean
+  aprendizagem?: ConfiguracaoAprendizagemResolvida
 }
 
 type EventoParcial = Partial<Omit<RegraEventoPerfil, 'diasPermitidos'>> & { diasPermitidos?: number[] }
@@ -27,6 +36,7 @@ type ConfigParcial = {
   presencial?: EventoParcial
   sincrono?: EventoParcial
   praticaProfissional?: boolean
+  aprendizagem?: { faseIntensivaDiasUteis?: number; diasIntensivos?: number[]; diasAtendimentoRegular?: number[]; horarioWebaula?: string; duracaoWebaulaHoras?: number }
 }
 type ItemLike = {
   ch?: number
@@ -73,6 +83,7 @@ const PRESETS: Record<Exclude<ModeloCronograma, 'personalizado'>, PerfilCronogra
     presencial: { ativo: false, modo: 'carga', duracaoHoras: 8, diasPermitidos: SABADO },
     sincrono: { ativo: true, modo: 'quantidade', quantidade: 0, duracaoHoras: 2, diasPermitidos: DIAS_UTEIS },
     praticaProfissional: true,
+    aprendizagem: { faseIntensivaDiasUteis: 23, diasIntensivos: DIAS_UTEIS, diasAtendimentoRegular: [1, 2], horarioWebaula: '13:30 às 17:00', duracaoWebaulaHoras: 3.5 },
   },
 }
 
@@ -84,6 +95,19 @@ const diasValidos = (dias: number[] | undefined, fallback: number[]) => {
 const numeroPositivo = (v: unknown, fallback: number | undefined) => {
   const n = Number(v)
   return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+
+const mesclarAprendizagem = (base: ConfiguracaoAprendizagemResolvida | undefined, override?: ConfigParcial['aprendizagem']): ConfiguracaoAprendizagemResolvida | undefined => {
+  if (!base && !override) return undefined
+  const b = base || { faseIntensivaDiasUteis: 0, diasIntensivos: DIAS_UTEIS, diasAtendimentoRegular: [1, 2], duracaoWebaulaHoras: 2 }
+  return {
+    faseIntensivaDiasUteis: Math.max(0, Math.floor(Number(override?.faseIntensivaDiasUteis ?? b.faseIntensivaDiasUteis) || 0)),
+    diasIntensivos: diasValidos(override?.diasIntensivos, b.diasIntensivos),
+    diasAtendimentoRegular: diasValidos(override?.diasAtendimentoRegular, b.diasAtendimentoRegular),
+    horarioWebaula: override?.horarioWebaula ?? b.horarioWebaula,
+    duracaoWebaulaHoras: numeroPositivo(override?.duracaoWebaulaHoras, b.duracaoWebaulaHoras) || 2,
+  }
 }
 
 const mesclarEvento = (base: RegraEventoPerfil, override?: EventoParcial): RegraEventoPerfil => ({
@@ -110,6 +134,7 @@ export function resolverPerfilCronograma(curso: CursoLike): PerfilCronogramaReso
     presencial: mesclarEvento(presencialBase, cfg.presencial),
     sincrono: mesclarEvento(base.sincrono, cfg.sincrono),
     praticaProfissional: cfg.praticaProfissional ?? base.praticaProfissional,
+    aprendizagem: mesclarAprendizagem(base.aprendizagem, cfg.aprendizagem),
   }
 }
 
@@ -123,6 +148,7 @@ export function resolverPerfilItem(item: ItemLike, curso: CursoLike): PerfilCron
     presencial: mesclarEvento(base.presencial, cfg.presencial),
     sincrono: mesclarEvento(base.sincrono, cfg.sincrono),
     praticaProfissional: cfg.praticaProfissional ?? base.praticaProfissional,
+    aprendizagem: mesclarAprendizagem(base.aprendizagem, cfg.aprendizagem),
   }
 }
 

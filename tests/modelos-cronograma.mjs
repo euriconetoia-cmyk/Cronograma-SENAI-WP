@@ -34,8 +34,8 @@ const aprendizagem = mk('aprendizagem', [
 ])
 {
   const g=compute(turma,aprendizagem,feriados)
-  assert.equal(g.rows[0].c.nsinc,4)
-  assert.equal(momentos(turma,g.rows[0],aprendizagem).length,4)
+  assert.equal(g.rows[0].c.nsinc,11)
+  assert.equal(momentos(turma,g.rows[0],aprendizagem).length,11)
   assert.equal(g.sumUC,100,'prática com carga deve compor a carga total do curso')
   assert.equal(g.nUC,1,'prática não deve aumentar a quantidade de UCs')
   assert.ok(g.rows[1].c.J>g.rows[0].c.K,'prática sequencial deve iniciar após a teoria')

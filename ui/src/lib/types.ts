@@ -7,7 +7,8 @@ export type ModeloCronograma = 'tecnico' | 'qualificacao' | 'distribuicao_diaria
 export type ModoQuantidadeEvento = 'carga' | 'quantidade' | 'manual'
 export type TipoEventoPedagogico = 'estudo_ava' | 'sincrono' | 'presencial' | 'web_aula' | 'atendimento' | 'atividade' | 'recuperacao' | 'pratica_empresa' | 'matricula' | 'postagem_notas' | 'inicio_curso' | 'fim_curso' | 'inicio_modulo' | 'fim_modulo'
 export interface RegraEventoCronograma { ativo?: boolean; modo?: ModoQuantidadeEvento; quantidade?: number; duracaoHoras?: number; diasPermitidos?: number[]; horario?: string }
-export interface ConfiguracaoCronograma { cargaDiaria?: number; diasEstudoPermitidos?: number[]; presencial?: RegraEventoCronograma; sincrono?: RegraEventoCronograma; praticaProfissional?: boolean }
+export interface ConfiguracaoAprendizagem { faseIntensivaDiasUteis?: number; diasIntensivos?: number[]; diasAtendimentoRegular?: number[]; horarioWebaula?: string; duracaoWebaulaHoras?: number }
+export interface ConfiguracaoCronograma { cargaDiaria?: number; diasEstudoPermitidos?: number[]; presencial?: RegraEventoCronograma; sincrono?: RegraEventoCronograma; praticaProfissional?: boolean; aprendizagem?: ConfiguracaoAprendizagem }
 export interface ConfiguracaoItemCronograma extends ConfiguracaoCronograma {}
 export interface Item { id: string; tipo: Tipo; nome: string; ch: number; pres: number; div: number; sincronos?: number; duracaoSincrono?: number; configuracaoCronograma?: ConfiguracaoItemCronograma }
 export interface Modulo { id: string; nome: string; itens: Item[] }

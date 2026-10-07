@@ -113,6 +113,13 @@ class Cronograma_EAD_Store {
 					return new WP_Error( 'cronograma_ead_invalido', 'Dias permitidos inválidos em ' . $tipo_evento . '.', array( 'status' => 400 ) );
 				}
 			}
+			if ( isset( $cfg['aprendizagem'] ) && is_array( $cfg['aprendizagem'] ) ) {
+				foreach ( array( 'diasIntensivos', 'diasAtendimentoRegular' ) as $campo_dias_aprendizagem ) {
+					if ( isset( $cfg['aprendizagem'][ $campo_dias_aprendizagem ] ) && ! self::dias_semana_validos( $cfg['aprendizagem'][ $campo_dias_aprendizagem ] ) ) {
+						return new WP_Error( 'cronograma_ead_invalido', 'Dias de atendimento inválidos na Aprendizagem.', array( 'status' => 400 ) );
+					}
+				}
+			}
 			foreach ( $c['modulos'] as $modulo ) {
 				if ( ! is_array( $modulo ) || empty( $modulo['id'] ) || ! self::valid_id( $modulo['id'] ) || ! isset( $modulo['itens'] ) || ! is_array( $modulo['itens'] ) ) {
 					return new WP_Error( 'cronograma_ead_invalido', 'Módulo com estrutura inválida.', array( 'status' => 400 ) );

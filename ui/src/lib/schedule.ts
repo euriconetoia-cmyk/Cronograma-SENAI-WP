@@ -30,6 +30,42 @@ export function workday(s: string, n: number, hol: Set<string> | null): string {
   return workdayPermitidos(s, n, hol, [1, 2, 3, 4, 5])
 }
 
+
+/** Último dia da fase intensiva de Aprendizagem. O primeiro dia da turma conta como dia 1. */
+export function fimFaseIntensivaAprendizagem(inicio: string, curso: Curso, hol: Set<string>): string | null {
+  const perfil = resolverPerfilItem({ configuracaoCronograma: undefined }, curso)
+  const ap = perfil.aprendizagem
+  if (perfil.modelo !== 'aprendizagem' || !ap || !inicio || ap.faseIntensivaDiasUteis <= 0) return null
+  return workdayPermitidos(inicio, Math.max(0, ap.faseIntensivaDiasUteis - 1), hol, ap.diasIntensivos)
+}
+
+/** Datas de atendimento/web aula de Aprendizagem dentro de uma UC. */
+export function datasAtendimentoAprendizagem(inicioTurma: string, J: string, K: string, curso: Curso, hol: Set<string>): string[] {
+  const perfil = resolverPerfilItem({ configuracaoCronograma: undefined }, curso)
+  const ap = perfil.aprendizagem
+  if (perfil.modelo !== 'aprendizagem' || !ap || !inicioTurma || !J || !K) return []
+  const fimIntensivo = fimFaseIntensivaAprendizagem(inicioTurma, curso, hol)
+  const out: string[] = []
+  for (let d = toN(J); d <= toN(K); d++) {
+    const ds = toS(d)
+    if (hol.has(ds)) continue
+    const w = dow(d)
+    const permitido = fimIntensivo && ds <= fimIntensivo ? ap.diasIntensivos.includes(w) : ap.diasAtendimentoRegular.includes(w)
+    if (permitido) out.push(ds)
+  }
+  return out
+}
+
+export function dataAtendimentoAprendizagemValida(inicioTurma: string, data: string, curso: Curso, hol: Set<string>): boolean {
+  if (!data || hol.has(data)) return false
+  const perfil = resolverPerfilItem({ configuracaoCronograma: undefined }, curso)
+  const ap = perfil.aprendizagem
+  if (perfil.modelo !== 'aprendizagem' || !ap || !inicioTurma) return false
+  const fimIntensivo = fimFaseIntensivaAprendizagem(inicioTurma, curso, hol)
+  const w = dow(toN(data))
+  return !!(fimIntensivo && data <= fimIntensivo ? ap.diasIntensivos.includes(w) : ap.diasAtendimentoRegular.includes(w))
+}
+
 export interface Calc { H: number; I: number; J: string | null; K: string | null; L: string | null; nenc: number; nsinc: number }
 export interface Row { m: Modulo; it: Item; first: boolean; c: Calc }
 export interface Result { curso: Curso; rows: Row[]; by: Record<string, Row>; end: string | null; sumUC: number; nUC: number }
@@ -55,7 +91,7 @@ export function compute(t: Pick<Turma, 'inicio' | 'unidadeId'>, curso: Curso, fe
     }
     const K = J ? workdayPermitidos(J, I, hol, diasEstudo) : null
     const nenc = it.tipo === 'uc' ? quantidadeEventosItem(it, curso, 'presencial') : it.tipo === 'intro' ? ((+it.pres || 0) > 0 ? 1 : 0) : 0
-    const nsinc = it.tipo === 'uc' ? quantidadeEventosItem(it, curso, 'sincrono') : 0
+    const nsinc = it.tipo === 'uc' ? (perfil.modelo === 'aprendizagem' && J && K && t.inicio ? datasAtendimentoAprendizagem(t.inicio, J, K, curso, hol).length : quantidadeEventosItem(it, curso, 'sincrono')) : 0
     const row: Row = { m, it, first: ix === 0, c: { H, I, J, K, L: null, nenc, nsinc } }
     rows.push(row); by[it.id] = row
     if (it.tipo === 'uc' || it.tipo === 'mat' || it.tipo === 'intro' || it.tipo === 'pratica') lastMain = row
@@ -92,7 +128,7 @@ export function sincronicos(t: Pick<Turma, 'itens'>, r: Row, curso: Curso): Enco
   const st: ItemTurma = t.itens[r.it.id] || {}
   const perfil = resolverPerfilItem(r.it, curso)
   const base = (st.sin || []).slice(0, r.c.nsinc)
-  while (base.length < r.c.nsinc) base.push({ d: '', h: perfil.sincrono.horario || curso.regras.horario, w: curso.regras.webHora })
+  while (base.length < r.c.nsinc) base.push({ d: '', h: perfil.aprendizagem?.horarioWebaula || perfil.sincrono.horario || curso.regras.horario, w: curso.regras.webHora })
   return base
 }
 
@@ -141,13 +177,16 @@ export function planejarEncontros(t: Pick<Turma, 'itens' | 'unidadeId'>, G: Resu
 }
 
 /** Calcula os momentos síncronos de todas as UCs, preservando datas preenchidas quando solicitado. */
-export function planejarSincronicos(t: Pick<Turma, 'itens' | 'unidadeId'>, G: Result, feriados: Feriado[], soVazios: boolean): Record<string, Encontro[]> {
+export function planejarSincronicos(t: Pick<Turma, 'itens' | 'unidadeId' | 'inicio'>, G: Result, feriados: Feriado[], soVazios: boolean): Record<string, Encontro[]> {
   const hol = new Set(feriadosDaTurma(t, feriados).map(f => f[0]))
   const out: Record<string, Encontro[]> = {}
   for (const r of G.rows) {
     if (r.it.tipo !== 'uc' || !r.c.J || r.c.nsinc <= 0) continue
     const atual = sincronicos(t, r, G.curso)
-    const sug = sugerirEventos(r.c.J, r.c.K, r.c.nsinc, hol, diasPermitidosEvento(r.it, G.curso, 'sincrono'))
+    const perfil = resolverPerfilItem(r.it, G.curso)
+    const sug = perfil.modelo === 'aprendizagem' && r.c.K
+      ? datasAtendimentoAprendizagem(t.inicio || r.c.J, r.c.J, r.c.K, G.curso, hol)
+      : sugerirEventos(r.c.J, r.c.K, r.c.nsinc, hol, diasPermitidosEvento(r.it, G.curso, 'sincrono'))
     const novo = atual.map((e, i) => (soVazios && e.d) ? e : { ...e, d: sug[i] || e.d })
     if (novo.some((e, i) => e.d !== atual[i].d)) out[r.it.id] = novo
   }
@@ -186,7 +225,9 @@ export function verificar(t: Turma, G: Result, todos: Feriado[]): Aviso[] {
       const n = `${ix + 1}º momento síncrono de ${r.it.nome}`
       if (!e.d) { out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} está sem data.`, dt: 'sem data' }); return }
       const w = dow(toN(e.d)), dt = fmtShort(e.d)
-      if (!diasSincronos.includes(w)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai em ${wdName(e.d)} (${dt}), fora dos dias permitidos (${diasSincronos.map(d => WD[d]).join(', ')}).`, dt })
+      if (G.curso.modeloCronograma === 'aprendizagem') {
+        if (!dataAtendimentoAprendizagemValida(t.inicio, e.d, G.curso, hol)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai fora da regra de atendimento da Aprendizagem (${dt}).`, dt })
+      } else if (!diasSincronos.includes(w)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai em ${wdName(e.d)} (${dt}), fora dos dias permitidos (${diasSincronos.map(d => WD[d]).join(', ')}).`, dt })
       if (hol.has(e.d)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai em um dia cadastrado como feriado ou férias (${dt}).`, dt })
       if (r.c.J && r.c.K && (e.d < r.c.J || e.d > r.c.K)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} (${dt}) fica fora do período da UC, de ${fmtShort(r.c.J)} a ${fmtShort(r.c.K)}.`, dt })
       if (prev && e.d <= prev) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} (${dt}) precisa ser depois do momento anterior.`, dt })
@@ -247,4 +288,4 @@ export const temPres = (it: { tipo: string; pres?: number | string }) => (it.tip
 /** O curso tem alguma etapa com carga presencial? */
 export const cursoTemPres = (curso: { modulos?: { itens?: { tipo: string; pres?: number | string }[] }[] }) => (curso.modulos || []).some(m => (m.itens || []).some(temPres))
 /** O curso tem encontros presenciais ou momentos síncronos configurados? */
-export const cursoTemMomentos = (curso: Curso) => (curso.modulos || []).some(m => (m.itens || []).some(it => it.tipo === 'uc' && (quantidadeEventosItem(it, curso, 'presencial') > 0 || quantidadeEventosItem(it, curso, 'sincrono') > 0)))
+export const cursoTemMomentos = (curso: Curso) => curso.modeloCronograma === 'aprendizagem' || (curso.modulos || []).some(m => (m.itens || []).some(it => it.tipo === 'uc' && (quantidadeEventosItem(it, curso, 'presencial') > 0 || quantidadeEventosItem(it, curso, 'sincrono') > 0)))
