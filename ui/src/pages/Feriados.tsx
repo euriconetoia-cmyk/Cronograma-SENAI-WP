@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Trash2 } from 'lucide-react'
+import { RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Field, Panel } from '@/components/Fields'
 import { useStore } from '@/lib/store'
@@ -11,13 +11,15 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 const pad = (n: number) => (n < 10 ? '0' : '') + n
 
 export function FeriadosPage() {
-  const { d, update, me } = useStore()
+  const { api, d, update, me } = useStore()
   const equipe = me.perfil === 'equipe'
   const [escopo, setEscopo] = useState('')
   const anos = useMemo(() => Array.from(new Set(d.feriados.map(f => f[0].slice(0, 4)))).sort(), [d.feriados])
   const [ano, setAno] = useState(() => (anos.includes(String(new Date().getFullYear())) ? String(new Date().getFullYear()) : anos[0] || String(new Date().getFullYear())))
   const [data, setData] = useState('')
   const [motivo, setMotivo] = useState('')
+  const [sincronizando, setSincronizando] = useState(false)
+  const sincronizados = useRef(new Set<string>())
   const mapa = useMemo(() => new Map(d.feriados.filter(f => (f[2] || '') === escopo).map(f => [f[0], f[1]])), [d.feriados, escopo])
   const gerais = useMemo(() => new Set(d.feriados.filter(f => !f[2]).map(f => f[0])), [d.feriados])
   const lista = d.feriados.map((f, i) => ({ f, i })).filter(x => x.f[0].startsWith(ano) && (x.f[2] || '') === escopo)
@@ -29,6 +31,26 @@ export function FeriadosPage() {
     setAno(dt.slice(0, 4)); setData(''); toast(T.feriados.adicionada)
   }
   const remover = (dt: string) => update(x => { x.feriados = x.feriados.filter(f => !(f[0] === dt && (f[2] || '') === escopo)) })
+  const sincronizarNacionais = async (forcar = false) => {
+    if (!equipe || escopo) return
+    if (!forcar && sincronizados.current.has(ano)) return
+    setSincronizando(true)
+    try {
+      const r = await api.feriadosNacionais(+ano)
+      const existentes = new Set(d.feriados.filter(x => !x[2]).map(x => x[0]))
+      const novos = r.feriados.filter(x => !existentes.has(x[0]))
+      if (novos.length) update(x => {
+        for (const h of novos) x.feriados.push([h[0], h[1]])
+        x.feriados.sort((a, b) => a[0].localeCompare(b[0]))
+      })
+      sincronizados.current.add(ano)
+      if (forcar) toast(novos.length ? `${novos.length} feriado(s) nacional(is) adicionado(s).` : 'Feriados nacionais já estavam atualizados.')
+    } catch (e) {
+      if (forcar) toast(e instanceof Error ? e.message : 'Não foi possível atualizar os feriados nacionais.')
+    } finally { setSincronizando(false) }
+  }
+  useEffect(() => { void sincronizarNacionais(false) }, [ano, equipe, escopo]) // eslint-disable-line react-hooks/exhaustive-deps
+
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,420px)]">
@@ -37,7 +59,8 @@ export function FeriadosPage() {
         {equipe && <label className="flex items-center gap-2 text-sm"><span className="kicker">{T.feriados.valeEm}</span>
           <select className="field-input w-auto" value={escopo} onChange={e => setEscopo(e.target.value)}><option value="">{T.feriados.todas}</option>{d.unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select></label>}
         <label className="flex items-center gap-2 text-sm"><span className="kicker">{T.feriados.ano}</span>
-          <select className="field-input w-auto" value={ano} onChange={e => setAno(e.target.value)}>{anos.map(a => <option key={a}>{a}</option>)}</select></label></div>}>
+          <select className="field-input w-auto" value={ano} onChange={e => setAno(e.target.value)}>{Array.from(new Set([...anos, String(new Date().getFullYear()), String(new Date().getFullYear()+1)])).sort().map(a => <option key={a}>{a}</option>)}</select></label>
+        {equipe && !escopo && <Button size="sm" variant="outline" disabled={sincronizando} onClick={() => void sincronizarNacionais(true)}><RefreshCw size={14} className={sincronizando ? 'animate-spin' : ''} />Atualizar nacionais</Button>}</div>}>
         <p className="mb-3 max-w-prose text-sm text-muted-foreground">{escopo ? T.feriados.ajudaUnidade : T.feriados.ajuda}</p>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {MESES.map((nome, m) => {
