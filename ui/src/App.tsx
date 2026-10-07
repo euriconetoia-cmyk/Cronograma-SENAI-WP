@@ -16,6 +16,7 @@ import { UnidadesPage } from '@/pages/Unidades'
 import { FeriadosPage } from '@/pages/Feriados'
 import { BackupPage } from '@/pages/Backup'
 import { AcessosPage } from '@/pages/Acessos'
+import { IntegracoesPage } from '@/pages/Integracoes'
 import { ConfigLayout } from '@/pages/Config'
 
 /** Se uma tela falhar, mostra um aviso com saída em vez de deixar a página em branco. */
@@ -68,6 +69,7 @@ function Router() {
       case 'acessos': return <AcessosPage />
       case 'unidades': return <UnidadesPage />
       case 'feriados': return <FeriadosPage />
+      case 'integracoes': return <IntegracoesPage />
       case 'backup': return <BackupPage />
       default: return <InicioPage />
     }
