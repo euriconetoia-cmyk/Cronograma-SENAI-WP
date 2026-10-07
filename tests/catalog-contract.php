@@ -10,7 +10,7 @@ require_once __DIR__ . '/../plugin-cronograma-ead-core/includes/class-store.php'
 function c_ok($cond,$m){ if(!$cond){fwrite(STDERR,"FAIL: $m\n");exit(1);} }
 
 $base = array(
-  'pessoas'=>array(), 'feriados'=>array(), 'unidades'=>array(array('id'=>'u1','nome'=>'Unidade')),
+  'pessoas'=>array(), 'feriados'=>array(), 'unidades'=>array(array('id'=>'u1','nome'=>'Unidade','cidade'=>'Goiânia','estado'=>'GO','codigoIbge'=>'5208707')),
   'cursos'=>array(array(
     'id'=>'c1','nome'=>'Aprendizagem','modeloCronograma'=>'aprendizagem','chTotal'=>22,'nota'=>'',
     'regras'=>array('hEncontro'=>8,'webDias'=>10,'webHora'=>'15h','postDias'=>3,'horario'=>'08h'),
@@ -33,10 +33,14 @@ echo "OK catalog-contract: multimodel catalog validation\n";
 
 $regional = $base;
 $regional['unidades'][0]['estado']='GO';
+$regional['unidades'][0]['cidade']='Goiânia';
+$regional['unidades'][0]['codigoIbge']='5208707';
 $regional['cursos'][0]['modalidade']='ead';
 $cleanRegional = Cronograma_EAD_Store::sanitize_payload($regional);
 c_ok(!is_wp_error($cleanRegional),'valid UF/modalidade rejected');
 c_ok($cleanRegional['unidades'][0]['estado']==='GO','UF not preserved');
+c_ok($cleanRegional['unidades'][0]['cidade']==='Goiânia','city not preserved');
+c_ok($cleanRegional['unidades'][0]['codigoIbge']==='5208707','IBGE code not preserved');
 c_ok($cleanRegional['cursos'][0]['modalidade']==='ead','EaD modality not preserved');
 
 $hibrido=$regional; $hibrido['cursos'][0]['modalidade']='semipresencial';
@@ -48,6 +52,12 @@ c_ok(!is_wp_error($cleanLegado) && $cleanLegado['cursos'][0]['modalidade']==='se
 
 $badUf=$regional; $badUf['unidades'][0]['estado']='XX';
 c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_payload($badUf)),'invalid UF must be rejected');
+
+$badIbge=$regional; $badIbge['unidades'][0]['codigoIbge']='123';
+c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_payload($badIbge)),'invalid IBGE code must be rejected');
+
+$badCidade=$regional; $badCidade['unidades'][0]['cidade']='';
+c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_payload($badCidade)),'empty city must be rejected');
 
 $badMod=$regional; $badMod['cursos'][0]['modalidade']='telepatia';
 c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_payload($badMod)),'invalid modality must be rejected');
