@@ -2,7 +2,7 @@ name: Test package
 on:
   push:
     branches:
-      - release/2.20.0-rc1
+      - release/2.21.0-modelos
   workflow_dispatch:
 permissions:
   contents: read
@@ -53,13 +53,13 @@ jobs:
           cp -R plugin-cronograma-ead-core test-dist/plugin/cronograma-ead-core
           cp -R theme-cronograma-ead-theme test-dist/theme/cronograma-ead-theme
           rm -rf test-dist/plugin/cronograma-ead-core/.parcel-cache
-          (cd test-dist/plugin && zip -qr ../cronograma-ead-core-2.20.0-rc1-TESTE.zip cronograma-ead-core)
-          (cd test-dist/theme && zip -qr ../cronograma-ead-theme-2.20.0-rc1-TESTE.zip cronograma-ead-theme)
-          unzip -t test-dist/cronograma-ead-core-2.20.0-rc1-TESTE.zip
-          unzip -t test-dist/cronograma-ead-theme-2.20.0-rc1-TESTE.zip
+          (cd test-dist/plugin && zip -qr ../cronograma-ead-core-2.21.0-rc1-TESTE.zip cronograma-ead-core)
+          (cd test-dist/theme && zip -qr ../cronograma-ead-theme-2.21.0-rc1-TESTE.zip cronograma-ead-theme)
+          unzip -t test-dist/cronograma-ead-core-2.21.0-rc1-TESTE.zip
+          unzip -t test-dist/cronograma-ead-theme-2.21.0-rc1-TESTE.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: cronograma-ead-2.20.0-rc1-TESTE
+          name: cronograma-ead-2.21.0-rc1-TESTE
           path: |
             test-dist/*.zip
             plugin-cronograma-ead-core/assets/app.js
