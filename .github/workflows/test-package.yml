@@ -2,7 +2,7 @@ name: Test package
 on:
   push:
     branches:
-      - release/2.19.0-rc1
+      - release/2.20.0-rc1
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,13 +24,25 @@ jobs:
         run: pnpm build:wp
       - name: PHP syntax check
         run: bash tests/php-syntax.sh
-      - name: Calendar contract
+      - name: Calendar contracts
         run: |
           php tests/unit-rules.php
           node tests/calendar-contract.mjs
+      - name: Catalog contract
+        run: php tests/catalog-contract.php
+      - name: Schedule profiles
+        run: node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-profiles.mjs
+      - name: Multimodel schedule engine
+        run: node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-multimodel.mjs
+      - name: Four official schedule models
+        run: node --experimental-strip-types --experimental-specifier-resolution=node tests/modelos-cronograma.mjs
       - name: Static security checks
         run: node tests/security-static.mjs
-      - name: Build test ZIPs
+      - name: Validate generated bundle
+        run: |
+          test -s plugin-cronograma-ead-core/assets/app.js
+          grep -q "2.20.0" plugin-cronograma-ead-core/cronograma-ead-core.php
+      - name: Build WordPress test ZIPs
         shell: bash
         run: |
           set -euo pipefail
@@ -38,11 +50,14 @@ jobs:
           mkdir -p test-dist/plugin test-dist/theme
           cp -R plugin-cronograma-ead-core test-dist/plugin/cronograma-ead-core
           cp -R theme-cronograma-ead-theme test-dist/theme/cronograma-ead-theme
-          (cd test-dist/plugin && zip -qr ../cronograma-ead-core-2.19.0-rc1-TESTE.zip cronograma-ead-core)
-          (cd test-dist/theme && zip -qr ../cronograma-ead-theme-2.19.0-rc1-TESTE.zip cronograma-ead-theme)
+          rm -rf test-dist/plugin/cronograma-ead-core/.parcel-cache
+          (cd test-dist/plugin && zip -qr ../cronograma-ead-core-2.20.0-rc1-TESTE.zip cronograma-ead-core)
+          (cd test-dist/theme && zip -qr ../cronograma-ead-theme-2.20.0-rc1-TESTE.zip cronograma-ead-theme)
+          unzip -t test-dist/cronograma-ead-core-2.20.0-rc1-TESTE.zip
+          unzip -t test-dist/cronograma-ead-theme-2.20.0-rc1-TESTE.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: cronograma-ead-2.19.0-rc1-TESTE
+          name: cronograma-ead-2.20.0-rc1-TESTE
           path: |
             test-dist/*.zip
             plugin-cronograma-ead-core/assets/app.js
