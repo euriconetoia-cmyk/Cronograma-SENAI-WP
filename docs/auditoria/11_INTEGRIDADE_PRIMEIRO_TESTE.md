@@ -164,3 +164,10 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Correção `e133ece3425d9586f06229d91c5c03406889ea44`: aquisição do mutex por `add_option` (unicidade do `option_name`), uso de `try/finally` para liberação e invalidação do cache de revisão antes da comparação.
 - Teste de contrato `3cebb6099cc2d0c68d2ec3e446c45a71faa516e4`: simula o mutex já adquirido e exige erro `cronograma_ead_ocupado` antes de liberar e permitir a escrita posterior.
 - **Pendências:** validar CI E2E com requisições realmente simultâneas e empacotamento, tratar recuperação de mutex abandonado por interrupção abrupta e tratar atualização parcial entre `OPT_DATA` e `OPT_REV`. Não implantar em produção antes disso.
+
+
+## Escrita parcial de opções — continuidade de 09/10/2026
+- CI #316 ainda estava em execução na consulta; não há aprovação final confirmada desse mutex atômico.
+- Commit `2c9709eef5a5809e18108ced57e5999f018c3884`: `Store::save()` passou a verificar retorno de gravação de dados e revisão; se a segunda gravação falhar, tenta restaurar o valor anterior dos dados e devolve erro `cronograma_ead_gravacao` HTTP 500.
+- Commit `d10e039f5585aadfcdddc555fea62f752441d090`: teste isolado simula falha de `update_option(OPT_REV)` e exige erro explícito e recuperação do catálogo anterior.
+- **Limitação técnica:** compensação por segundo `update_option()` não constitui transação atômica entre duas opções, nem cobre falha da própria compensação. São necessárias validações em WordPress real, falhas de gravação de dados, recuperação do lock após queda e revisão de persistência antes da homologação.
