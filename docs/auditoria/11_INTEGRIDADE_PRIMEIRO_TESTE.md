@@ -38,3 +38,10 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - O ensaio REST de duas gravações concorrentes foi incluído no gate aprovado. Resultado é limitado ao cenário e à repetição do runner, não constitui prova de serialização sob carga sustentada.
 - Commit `2b5f8ad85da5e514c82204472601e5010989a504`: cenário negativo de restauração por token inválido. Verifica HTTP 409 e igualdade de catálogo, revisão e turmas antes/depois. **Novo cenário ainda não possui CI aprovado nesta atualização.**
 - Permanecem bloqueados para aprovação final: falha de banco após escrita parcial; rollback com falha de transação; concorrência com barreiras, retries e cargas; verificação de histórico e versões durante restauração; EXPLAIN e baseline.
+
+
+## Correção incremental: transação de importação — 09/10/2026
+- CI #202 (https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/37978404973) aprovado integralmente, incluindo o cenário de confirmação inválida do backup; PHPCS, PHPStan, release-gate e empacotamento concluídos com sucesso.
+- Identificação: `Cronograma_EAD_Service::importar()` executava `Cronograma_EAD_DB::begin()` sem inspecionar retorno; se START TRANSACTION falhasse, haveria risco de continuar a escrita sem garantia transacional.
+- Correção `a10e4fdbca3c627d77bc080575bfbfd76461ef70`: abortar a operação com HTTP 500 e mensagem de erro antes de alterar o catálogo caso o início da transação falhe.
+- **Pendente:** verificar CI do commit de correção e desenvolver injeção efetiva de falha de START TRANSACTION e de erros intermediários de DB/opções. Esta alteração não prova que restauração inteira é atômica em todos os modos.
