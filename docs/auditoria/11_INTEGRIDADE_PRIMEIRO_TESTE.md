@@ -119,3 +119,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - CI #264 terminou **FAILURE**. A injeção atingiu `START TRANSACTION`, mas o teste comparava `get_error_code()` a `transacao` enquanto `Service::erro()` prefixa o código com `cronograma_ead_`. Esse erro de asserção impede concluir que houve falha de rollback.
 - Commit `103dfa0019712c12e1fff2174c359404849a5119` corrige as expectativas para `cronograma_ead_transacao`, `cronograma_ead_importacao` e `cronograma_ead_restauracao`, em todos os três ensaios de injeção.
 - Novo pipeline precisa demonstrar os estados do banco após cada falha; o problema do teste de exportação foi tratado separadamente no commit `00d5863`.
+
+
+## Bloqueio adicional do Release Gate — 09/10/2026
+- Auditoria do `tests/e2e.mjs` revelou que suas asserções somavam `fails`, mas não definiam `process.exitCode=1` ao final; o Release Gate podia prosseguir mesmo após relatar `FALHA backup exporta`.
+- Commit `05c0ac068ed02a630df69b7ef7febbc71c842881`: asserções E2E agora fazem o processo Node sair com código não zero quando houver falhas; a asserção de exportação registra status HTTP, quantidade de turmas e eventual código de erro para diagnóstico.
+- CI #268 também apresentou falhas anteriores à correção dos códigos de `WP_Error` (prefixo `cronograma_ead_`); CI #278 estava em andamento. Não afirmar rollback comprovado até passar o pipeline com o novo mecanismo de falha obrigatória.
