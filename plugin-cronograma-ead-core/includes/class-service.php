@@ -1113,14 +1113,18 @@ class Cronograma_EAD_Service {
 						'unidade' => $unidade_snapshot,
 						'versao' => isset( $t['versao'] ) ? (int) $t['versao'] : 1,
 					);
-					Cronograma_EAD_DB::salvar_versao(
+					if ( ! Cronograma_EAD_DB::salvar_versao(
 						$t['id'],
 						isset( $t['vigente']['versao'] ) ? (int) $t['vigente']['versao'] : ( isset( $t['versao'] ) ? (int) $t['versao'] : 1 ),
 						$snapshot,
 						get_current_user_id(),
 						isset( $t['vigente']['por'] ) ? (string) $t['vigente']['por'] : 'Backup restaurado',
 						isset( $t['vigente']['ressalva'] ) ? (string) $t['vigente']['ressalva'] : ''
-					);
+					) ) {
+						Cronograma_EAD_DB::rollback();
+						Cronograma_EAD_Store::restore_snapshot( $catalog_before );
+						return self::erro( 'restauracao', 'Falha ao restaurar o histórico de versões. Nada foi alterado.', 500 );
+					}
 				}
 			}
 		} else {
