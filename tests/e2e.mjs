@@ -47,6 +47,30 @@ const atA=await U.admin.s.api('GET','atividade',undefined,U.admin.n); ok(atA.sta
   const sv=await U.admin.s.api('POST','catalogo',{data:cat,rev:bt.j.crev},U.admin.n); ok(sv.status===200,'salva catálogo com modalidade ('+sv.status+')')
   const b2=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n); ok(b2.j.catalogo.cursos[0].modalidade==='semipresencial'&&b2.j.catalogo.cursos[0].categoria==='qualificacao','modalidade do curso persistiu')
   const b3=await U.coord_itb.s.api('GET','bootstrap',undefined,U.coord_itb.n); ok(b3.j.catalogo.cursos.every(c=>c.modalidade!==undefined&&c.categoria!==undefined),'unidade também recebe a modalidade') }
+// Concorrência real de requisições REST sobre a mesma revisão do catálogo.
+{
+  const initial = await boot('admin')
+  ok(initial.status===200, 'bootstrap para teste concorrente de catálogo')
+  if (initial.status===200) {
+    const rev = initial.j.crev
+    const payload1 = structuredClone(initial.j.catalogo)
+    const payload2 = structuredClone(initial.j.catalogo)
+    payload1.cursos[0].nota = 'Concorrrencia teste A'
+    payload2.cursos[0].nota = 'Concorrrencia teste B'
+    const [r1, r2] = await Promise.all([
+      U.admin.s.api('POST','catalogo',{data:payload1,rev},U.admin.n),
+      U.admin.s.api('POST','catalogo',{data:payload2,rev},U.admin.n),
+    ])
+    const aceitas = [r1,r2].filter(r => r.status===200)
+    const rejeitadas = [r1,r2].filter(r => r.status===409 || r.status===503)
+    ok(aceitas.length===1 && rejeitadas.length===1,
+      'gravação simultânea: somente uma aceita e outra recebe conflito/bloqueio ('+r1.status+', '+r2.status+')')
+    const after = await boot('admin')
+    const vencedora = r1.status===200 ? payload1.cursos[0].nota : payload2.cursos[0].nota
+    ok(after.status===200 && after.j.crev===rev+1 && after.j.catalogo.cursos[0].nota===vencedora,
+      'concorrência: catálogo final e revisão refletem somente a escrita aceita')
+  }
+}
 const ex=await U.admin.s.api('GET','exportar',undefined,U.admin.n); ok(ex.status===200&&ex.j.turmas.length>=2,'backup exporta')
 ok(ex.j?.schemaVersion===4&&ex.j?.backupMode==='full-state'&&typeof ex.j?.checksum==='string','backup usa formato completo v4')
 const exu=await U.coord_itb.s.api('GET','exportar',undefined,U.coord_itb.n); ok(exu.status===403,'unidade não exporta backup ('+exu.status+')')
