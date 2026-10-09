@@ -60,3 +60,11 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Correção `53da3708b015f2de6f067a68b3a24f86f8796a2a`: conferir `body.rev` contra revisão atual **antes** de criar backup pré-importação e começar transação; retornar conflito 409 caso divergente. Todas as modalidades passam a usar a revisão enviada no `Store::save`.
 - Teste `96815212f64e015cd6cb00b62a800bdcc1c0b693`: tentativa de restauração `full-state` com revisão obsoleta exige 409 e nenhuma alteração de turmas, catálogo ou revisão no WordPress descartável.
 - **Pendente:** aprovação do novo CI, teste de alteração concorrente no intervalo entre verificação e escrita, e injeção de falhas de transação/rollback.
+
+
+## Proteção do histórico na restauração — 09/10/2026
+- CI #236: job release-gate concluído com **SUCCESS**, confirmando o cenário de rejeição de revisão obsoleta.
+- Achado: o retorno de `Cronograma_EAD_DB::salvar_versao()` durante `fullRestore` não era verificado. Uma falha de INSERT de histórico podia resultar em importação considerada bem-sucedida sem a versão esperada.
+- Correção `c383297fe413305fed785cad90a837e308ce18bc`: se salvar o snapshot de versão falhar, efetuar rollback SQL, restaurar catálogo anterior e retornar erro 500.
+- Contrato estático `ca3a37aea0cf7d39311f299ec99248fa89802d00`: exige verificar o retorno de `salvar_versao()` e presença de tratamento explícito.
+- **Pendente:** CI dos commits; teste injetando falha de INSERT na tabela de versões, testes de restauração com múltiplas versões e prova de rollback sob diferentes engines SQL.
