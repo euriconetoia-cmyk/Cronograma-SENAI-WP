@@ -14,6 +14,29 @@ const U={}
 for(const u of ['admin','coord_itb','aux_itb','coord_luz','consulta']){ const s=new Sess(); const st=await s.login(u); const p=await s.page(pid); ok(p.status===200&&p.cfg,`${u}: login (${st}) e página carrega com config`); U[u]={s,n:p.cfg?.nonce,perfil:p.cfg?.perfil}; }
 console.log('perfis:',Object.entries(U).map(([k,v])=>k+'='+v.perfil).join(' '))
 ok(U.admin.perfil==='equipe','admin = equipe'); ok(U.coord_itb.perfil==='unidade','coord_itb = unidade'); ok(U.consulta.perfil==='consulta','consulta = consulta')
+// As configurações de credenciais requerem CAP_CONFIG, não apenas CAP_CATALOG.
+{
+  const adminConfig = await U.admin.s.api('GET','feriados/config',undefined,U.admin.n)
+  ok(adminConfig.status===200 && typeof adminConfig.j?.municipalConfigurado==='boolean',
+    'administrador consulta configuração de feriados (200)')
+  for (const role of ['coord_itb','aux_itb','consulta']) {
+    const read = await U[role].s.api('GET','feriados/config',undefined,U[role].n)
+    const write = await U[role].s.api('POST','feriados/config',{apiKey:''},U[role].n)
+    ok(read.status===403 && write.status===403,
+      role+' não acessa nem altera credenciais de feriados (403/403)')
+  }
+  const equipe = new Sess()
+  const equipeLogin = await equipe.login('equipe2')
+  const equipePage = await equipe.page(pid)
+  ok(equipeLogin===302 && !!equipePage.cfg,'equipe operacional autentica para testar permissões')
+  if (equipePage.cfg) {
+    const n = equipePage.cfg.nonce
+    const read = await equipe.api('GET','feriados/config',undefined,n)
+    const write = await equipe.api('POST','feriados/config',{apiKey:''},n)
+    ok(read.status===403 && write.status===403,
+      'equipe com permissão de catálogo não altera credenciais (403/403)')
+  }
+}
 const boot=async u=>(await U[u].s.api('GET','bootstrap',undefined,U[u].n))
 let b=await boot('admin'); ok(b.status===200,'bootstrap admin 200'); const turmas=b.j?.turmas||[]; console.log('turmas admin:',turmas.map(t=>t.id+':'+t.status).join(', '))
 const bi=await boot('coord_itb'); ok((bi.j.turmas||[]).every(t=>t.unidadeId==='u_itb'),'coord_itb só vê Itumbiara ('+(bi.j.turmas||[]).length+')')
