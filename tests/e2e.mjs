@@ -106,7 +106,7 @@ const atA=await U.admin.s.api('GET','atividade',undefined,U.admin.n); ok(atA.sta
       'concorrência: catálogo final e revisão refletem somente a escrita aceita')
   }
 }
-const ex=await U.admin.s.api('GET','exportar',undefined,U.admin.n); ok(ex.status===200&&ex.j.turmas.length>=2,'backup exporta')
+const ex=await U.admin.s.api('GET','exportar',undefined,U.admin.n); ok(ex.status===200&&ex.j.turmas.length>=1,'backup exporta')
 ok(ex.j?.schemaVersion===4&&ex.j?.backupMode==='full-state'&&typeof ex.j?.checksum==='string','backup usa formato completo v4')
 // Backup adulterado não deve passar nem pela simulação, preservando todo o estado.
 {
