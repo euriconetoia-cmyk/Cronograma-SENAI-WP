@@ -125,3 +125,10 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Auditoria do `tests/e2e.mjs` revelou que suas asserções somavam `fails`, mas não definiam `process.exitCode=1` ao final; o Release Gate podia prosseguir mesmo após relatar `FALHA backup exporta`.
 - Commit `05c0ac068ed02a630df69b7ef7febbc71c842881`: asserções E2E agora fazem o processo Node sair com código não zero quando houver falhas; a asserção de exportação registra status HTTP, quantidade de turmas e eventual código de erro para diagnóstico.
 - CI #268 também apresentou falhas anteriores à correção dos códigos de `WP_Error` (prefixo `cronograma_ead_`); CI #278 estava em andamento. Não afirmar rollback comprovado até passar o pipeline com o novo mecanismo de falha obrigatória.
+
+
+## CI #278 — falha real do critério de recuperação em COMMIT
+- Log do CI #278 mostra que a falha artificial em `START TRANSACTION` passou pelo teste de preservação de dados. Na sequência, a falha artificial em `COMMIT` foi interceptada, mas o cenário encerrou com `Falha no COMMIT não preservou integralmente os dados.`
+- Não se pode concluir ainda se a divergência é no catálogo, em alguma tabela ou apenas na ordenação da consulta SQL usada para comparar registros. A implementação **não está aprovada para rollback de COMMIT**.
+- Commit `b76fc027d0db1e56ad9914a54592347c75dd4676`: adiciona diagnóstico de igualdade do catálogo e, por tabela, contagens antes/depois quando a recuperação diverge, sem tornar o teste permissivo. Inspecionar próximo pipeline antes de alterar lógica transacional.
+- CI #282 ainda constava em andamento na última verificação, sem resultado final confirmado.
