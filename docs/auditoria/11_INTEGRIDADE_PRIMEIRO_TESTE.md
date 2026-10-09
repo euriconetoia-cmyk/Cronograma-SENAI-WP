@@ -30,3 +30,11 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Critérios: exatamente uma operação HTTP 200; a outra deve ser rejeitada com HTTP 409 (revisão) ou 503 (bloqueio); a revisão final deve subir apenas uma unidade; o catálogo final deve corresponder à escrita aceita.
 - Limites: duas requisições em `Promise.all` não garantem colisão no instante crítico. Testes repetidos/controle de barreira, falhas de update_option e rollback continuam pendentes. Nenhum resultado desta ampliação foi constatado no momento da escrita.
 - CI #194: `release-gate` aprovado na inspeção de passos; processo de empacotamento ainda em progresso naquela consulta. URL https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/37971117930.
+
+
+## Resultados e extensão — 09/10/2026
+
+- CI #198 executado e concluído com **SUCCESS** (GitHub Actions run ID 37971384534). O release-gate, o empacotamento e upload de evidências passaram. Link: https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/37971384534.
+- O ensaio REST de duas gravações concorrentes foi incluído no gate aprovado. Resultado é limitado ao cenário e à repetição do runner, não constitui prova de serialização sob carga sustentada.
+- Commit `2b5f8ad85da5e514c82204472601e5010989a504`: cenário negativo de restauração por token inválido. Verifica HTTP 409 e igualdade de catálogo, revisão e turmas antes/depois. **Novo cenário ainda não possui CI aprovado nesta atualização.**
+- Permanecem bloqueados para aprovação final: falha de banco após escrita parcial; rollback com falha de transação; concorrência com barreiras, retries e cargas; verificação de histórico e versões durante restauração; EXPLAIN e baseline.
