@@ -18,6 +18,7 @@ checks.push([!accounts.match(/return\s+array\s*\([^)]*['\"]link['\"]/s), 'Passwo
 checks.push([accounts.includes('2 * HOUR_IN_SECONDS'), 'Reset expiration hardened to 2 hours']);
 checks.push([rest.includes("'/auditoria'") && rest.includes('can_audit'), 'Audit endpoint has dedicated permission']);
 checks.push([rest.includes('can_manage_catalog') && rest.includes('can_manage_accounts') && rest.includes('can_import') && rest.includes('can_export'), 'REST uses operation-specific capability callbacks']);
+checks.push([/['"]\/feriados\/config['"]/.test(rest) && /'callback'\s*=>\s*array\( __CLASS__, 'feriados_config' \), 'permission_callback'\s*=>\s*array\( __CLASS__, 'can_configure' \)/.test(rest) && /'callback'\s*=>\s*array\( __CLASS__, 'feriados_config_salvar' \), 'permission_callback'\s*=>\s*array\( __CLASS__, 'can_configure' \)/.test(rest), 'Holiday integration config GET and POST require dedicated configuration permission']);
 checks.push([!ui.includes('Copiar só o link') && !ui.includes('cred.link'), 'Frontend does not expose reset link copying']);
 checks.push([store.includes('256 * 1024') || store.includes('262144'), 'Turma payload has size limit']);
 checks.push([service.includes('Cronograma_EAD_DB::begin()') && service.includes('Cronograma_EAD_DB::rollback()'), 'Critical service operations use transactions']);
