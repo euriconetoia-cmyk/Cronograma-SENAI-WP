@@ -94,6 +94,14 @@ $after_commit_catalog = Cronograma_EAD_Store::get();
 $after_commit_tables = $read_tables();
 if ( $before !== $after_commit_catalog || $tables_before !== $after_commit_tables ) {
 	WP_CLI::warning( 'Diferenças após falha de COMMIT: catálogo=' . ( $before === $after_commit_catalog ? 'igual' : 'diferente' ) );
+	if ( $before !== $after_commit_catalog ) {
+		WP_CLI::warning( 'Revisão anterior=' . $before['rev'] . '; revisão posterior=' . $after_commit_catalog['rev'] );
+		foreach ( array( 'cursos', 'pessoas', 'feriados', 'unidades' ) as $field ) {
+			if ( $before['data'][ $field ] !== $after_commit_catalog['data'][ $field ] ) {
+				WP_CLI::warning( 'Diferença no campo do catálogo: ' . $field . '; contagens antes/depois=' . count( $before['data'][ $field ] ) . '/' . count( $after_commit_catalog['data'][ $field ] ) );
+			}
+		}
+	}
 	foreach ( $tables as $table_name ) {
 		if ( $tables_before[ $table_name ] !== $after_commit_tables[ $table_name ] ) {
 			WP_CLI::warning( 'Diferença na tabela ' . $table_name . ': antes=' . count( $tables_before[ $table_name ] ) . ', depois=' . count( $after_commit_tables[ $table_name ] ) );
