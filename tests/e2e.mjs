@@ -168,8 +168,12 @@ ok(afterRestore.j.crev===beforeRestore.j.crev+1,
 
 if (backedFlow?.vigente?.versao) {
   const v = await U.admin.s.api('GET',`turmas/${ID}/versoes/${backedFlow.vigente.versao}`,undefined,U.admin.n)
-  ok(v.status===200 && !!v.j,
-    'restauração permite consultar snapshot da versão vigente ('+v.status+')')
+  ok(v.status===200 &&
+    v.j?.versao===backedFlow.vigente.versao &&
+    v.j?.snapshot?.turma?.id===ID &&
+    v.j?.snapshot?.curso?.id===backedFlow.cursoId &&
+    v.j?.snapshot?.unidade?.id===backedFlow.unidadeId,
+    'restauração preserva snapshot da versão vigente e referências ('+v.status+')')
 }
 
 console.log(fails?`\n${fails} FALHA(S)`:'\nTUDO OK')
