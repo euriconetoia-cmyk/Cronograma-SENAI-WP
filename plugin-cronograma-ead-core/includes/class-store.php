@@ -55,21 +55,28 @@ class Cronograma_EAD_Store {
 		if ( false === $json || strlen( $json ) > self::MAX_BYTES ) {
 			return new WP_Error( 'cronograma_ead_grande', 'Os dados são grandes demais para salvar.', array( 'status' => 413 ) );
 		}
-		if ( get_transient( 'cronograma_ead_lock' ) ) {
+		// add_option e atomico: o indice UNIQUE option_name garante um unico escritor.
+		// O antigo get_transient/set_transient permitia que duas requisicoes
+		// adquirissem o mesmo lock simultaneamente.
+		$lock = 'cronograma_ead_catalog_write_lock';
+		if ( ! add_option( $lock, time(), '', false ) ) {
 			return new WP_Error( 'cronograma_ead_ocupado', 'Outra gravação está em andamento. Tente de novo.', array( 'status' => 503 ) );
 		}
-		set_transient( 'cronograma_ead_lock', 1, 10 );
-
-		$current = (int) get_option( self::OPT_REV, 0 );
-		if ( (int) $rev !== $current ) {
-			delete_transient( 'cronograma_ead_lock' );
-			return new WP_Error( 'cronograma_ead_conflito', 'Os dados foram alterados por outra pessoa.', array( 'status' => 409, 'rev' => $current ) );
+		try {
+			// Nao confiar no cache de options ao arbitrar revisoes entre requisicoes.
+			wp_cache_delete( self::OPT_REV, 'options' );
+			wp_cache_delete( 'alloptions', 'options' );
+			$current = (int) get_option( self::OPT_REV, 0 );
+			if ( (int) $rev !== $current ) {
+				return new WP_Error( 'cronograma_ead_conflito', 'Os dados foram alterados por outra pessoa.', array( 'status' => 409, 'rev' => $current ) );
+			}
+			update_option( self::OPT_DATA, $json, false );
+			$new = $current + 1;
+			update_option( self::OPT_REV, $new, false );
+			return array( 'rev' => $new );
+		} finally {
+			delete_option( $lock );
 		}
-		update_option( self::OPT_DATA, $json, false );
-		$new = $current + 1;
-		update_option( self::OPT_REV, $new, false );
-		delete_transient( 'cronograma_ead_lock' );
-		return array( 'rev' => $new );
 	}
 
 	/** Restaura exatamente um snapshot interno do catálogo após falha transacional. */
