@@ -70,9 +70,18 @@ class Cronograma_EAD_Store {
 			if ( (int) $rev !== $current ) {
 				return new WP_Error( 'cronograma_ead_conflito', 'Os dados foram alterados por outra pessoa.', array( 'status' => 409, 'rev' => $current ) );
 			}
-			update_option( self::OPT_DATA, $json, false );
+			$previous = get_option( self::OPT_DATA, '' );
+			if ( ! update_option( self::OPT_DATA, $json, false ) && $previous !== $json ) {
+				return new WP_Error( 'cronograma_ead_gravacao', 'Não foi possível gravar os dados do catálogo.', array( 'status' => 500 ) );
+			}
 			$new = $current + 1;
-			update_option( self::OPT_REV, $new, false );
+			if ( ! update_option( self::OPT_REV, $new, false ) ) {
+				// Não deixar os dados novos com a revisão antiga, caso o segundo write falhe.
+				update_option( self::OPT_DATA, $previous, false );
+				wp_cache_delete( self::OPT_DATA, 'options' );
+				wp_cache_delete( 'alloptions', 'options' );
+				return new WP_Error( 'cronograma_ead_gravacao', 'Não foi possível atualizar a revisão do catálogo.', array( 'status' => 500 ) );
+			}
 			return array( 'rev' => $new );
 		} finally {
 			delete_option( $lock );
