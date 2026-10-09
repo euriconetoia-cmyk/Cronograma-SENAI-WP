@@ -16,6 +16,9 @@ $test_options = array();
 $test_transients = array();
 function get_option( $name, $fallback = false ) { global $test_options; return $test_options[ $name ] ?? $fallback; }
 function update_option( $name, $value, $autoload = null ) { global $test_options; $test_options[ $name ] = $value; return true; }
+function add_option( $name, $value, $deprecated = '', $autoload = false ) { global $test_options; if ( array_key_exists( $name, $test_options ) ) { return false; } $test_options[ $name ] = $value; return true; }
+function delete_option( $name ) { global $test_options; unset( $test_options[ $name ] ); return true; }
+function wp_cache_delete( $key, $group = '' ) { return true; }
 function get_transient( $name ) { global $test_transients; return $test_transients[ $name ] ?? false; }
 function set_transient( $name, $value, $expiration ) { global $test_transients; $test_transients[ $name ] = $value; return true; }
 function delete_transient( $name ) { global $test_transients; unset( $test_transients[ $name ] ); return true; }
@@ -29,6 +32,11 @@ $first = Cronograma_EAD_Store::save( $catalog, 0 );
 ensure( ! is_wp_error( $first ) && 1 === $first['rev'], 'A primeira atualização deve gerar revisão 1.' );
 $stale = Cronograma_EAD_Store::save( $catalog, 0 );
 ensure( is_wp_error( $stale ) && 'cronograma_ead_conflito' === $stale->code, 'Revisão obsoleta deve ser rejeitada.' );
+$lock_name = 'cronograma_ead_catalog_write_lock';
+ensure( add_option( $lock_name, time(), '', false ), 'Fixture deve conseguir adquirir mutex.' );
+$blocked = Cronograma_EAD_Store::save( $catalog, 1 );
+ensure( is_wp_error( $blocked ) && 'cronograma_ead_ocupado' === $blocked->code, 'Gravação concorrente deve ser bloqueada por mutex atômico.' );
+delete_option( $lock_name );
 $second = Cronograma_EAD_Store::save( $catalog, 1 );
 ensure( ! is_wp_error( $second ) && 2 === $second['rev'], 'A revisão atual deve permitir atualização.' );
 $read = Cronograma_EAD_Store::get();
