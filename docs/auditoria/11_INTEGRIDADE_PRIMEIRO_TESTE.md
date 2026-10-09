@@ -149,3 +149,10 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 ## Investigação do WordPress option cache após rollback
 - Commits `06bac1a208ef98047b8c3802155d537778c10fd4` e `8f0573fbee208867363d685ae373f8d4d9f43bbd`: o teste de COMMIT falho passa a consultar `wp_options` diretamente, registrando somente valor da revisão e hashes SHA-256 do JSON do catálogo, para distinguir estado SQL de estado observado pela API de opções/cache.
 - CI #290 e #294 ainda estavam em execução na consulta. Não foi confirmada a causa; a instrumentação não altera a lógica de recuperação e ainda exige CI e análise posterior.
+
+
+## Correção de cache de opções após rollback — 09/10/2026
+- CI #294: **FAILURE**, com divergência efetiva em revisão de catálogo (`antes=5`, `depois=6`) após falha provocada em `COMMIT`.
+- Correção em `class-store.php` commits `90c3190eab065180dfa2e2579b735b1b2be901c6` e `d841f5552d723006caed6589fc221937888564d6`: `restore_snapshot()` invalida entradas do cache WordPress para dados e revisão antes e depois da restauração, relê os dados persistidos e confirma **revisão e conteúdo**.
+- Hipótese técnica: o cache de `get_option` mantinha revisão nova após rollback do banco. A causa ainda necessita confirmação por teste; CI #300 estava em progresso e foi criado antes da correção.
+- Permanecem pendentes: checar resultados da nova execução, recuperar cenário de opções parciais, validação de falha transacional real e concorrência.
