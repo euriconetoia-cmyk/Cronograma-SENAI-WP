@@ -22,3 +22,11 @@ Branch: release/2.21.0-modelos
 - Definir correção de persistência só após decidir o contrato de atomicidade, proteção contra escrita simultânea e estratégia de migração.
 
 Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não executados.**
+
+
+## Ampliação de teste — concorrência REST
+
+- Commit `ff83045c92c5b2a281f12fcacc3050d821ea9306` acrescenta ao `tests/e2e.mjs` um ensaio de duas chamadas `POST catalogo` simultâneas, partindo da mesma revisão, usando o banco WordPress descartável do CI.
+- Critérios: exatamente uma operação HTTP 200; a outra deve ser rejeitada com HTTP 409 (revisão) ou 503 (bloqueio); a revisão final deve subir apenas uma unidade; o catálogo final deve corresponder à escrita aceita.
+- Limites: duas requisições em `Promise.all` não garantem colisão no instante crítico. Testes repetidos/controle de barreira, falhas de update_option e rollback continuam pendentes. Nenhum resultado desta ampliação foi constatado no momento da escrita.
+- CI #194: `release-gate` aprovado na inspeção de passos; processo de empacotamento ainda em progresso naquela consulta. URL https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/37971117930.
