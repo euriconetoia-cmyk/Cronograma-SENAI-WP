@@ -142,6 +142,16 @@ ok(afterInvalid.status===200 &&
   JSON.stringify(afterInvalid.j.catalogo)===JSON.stringify(beforeInvalid.j.catalogo) &&
   JSON.stringify(afterInvalid.j.turmas)===JSON.stringify(beforeInvalid.j.turmas),
   'backup: confirmação inválida preserva catálogo, revisão e turmas')
+// Uma restauração completa não deve aceitar revisão anterior à atual.
+const beforeStale = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+const staleRev = await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev-1,confirmacao:sim.j.confirmacao,simular:false},U.admin.n)
+ok(staleRev.status===409,'backup: revisão obsoleta rejeitada mesmo em full-state (409)')
+const afterStale = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+ok(afterStale.status===200 &&
+  afterStale.j.crev===beforeStale.j.crev &&
+  JSON.stringify(afterStale.j.catalogo)===JSON.stringify(beforeStale.j.catalogo) &&
+  JSON.stringify(afterStale.j.turmas)===JSON.stringify(beforeStale.j.turmas),
+  'backup: revisão obsoleta não altera catálogo, revisão ou turmas')
 const restored=await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev,confirmacao:sim.j.confirmacao,simular:false},U.admin.n)
 ok(restored.status===200,'restauração completa executa ('+restored.status+')')
 const afterRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
