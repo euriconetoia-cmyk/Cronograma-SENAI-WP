@@ -38,3 +38,9 @@ Estado: segurança de rota **implementada**; E2E e homologação de permissões 
 - Contrato estático de interface incluído no `tests/security-static.mjs`, commit `2e6cae7b1ede8d88449516f3fe73726f3d94b17e`.
 - CI #216 (teste de autorização por papéis) ainda estava em execução na última consulta desta rodada; CI dos commits de interface ainda não confirmado.
 - A validação visual em desktop/mobile, acessibilidade e fluxos reais continuam pendentes. Nenhuma alteração em produção.
+
+
+## Ampliação do teste de integração administrativa
+- Commit `5f0266840eefbdbad56d8170e447a603f21528f4`: cenário E2E administrativo que salva credencial **sintética**, lê apenas o estado booleano sem exposição do segredo e remove a credencial, exclusivamente no WordPress descartável do CI.
+- O cenário complementa a autorização por perfis, mas não valida provedores reais de feriados nem credenciais reais.
+- CI #216 teve job release-gate com SUCCESS confirmado. CI #222 ainda estava em execução na consulta desta rodada; aguardar resultado do novo CI após o commit do teste.
