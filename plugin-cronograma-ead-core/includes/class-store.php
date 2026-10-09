@@ -77,9 +77,12 @@ class Cronograma_EAD_Store {
 			$new = $current + 1;
 			if ( ! update_option( self::OPT_REV, $new, false ) ) {
 				// Não deixar os dados novos com a revisão antiga, caso o segundo write falhe.
-				update_option( self::OPT_DATA, $previous, false );
+				$compensated = update_option( self::OPT_DATA, $previous, false );
 				wp_cache_delete( self::OPT_DATA, 'options' );
 				wp_cache_delete( 'alloptions', 'options' );
+				if ( ! $compensated && get_option( self::OPT_DATA, '' ) !== $previous ) {
+					return new WP_Error( 'cronograma_ead_inconsistencia', 'Falha crítica ao recuperar o catálogo. Bloqueie novas operações e recupere o backup.', array( 'status' => 500 ) );
+				}
 				return new WP_Error( 'cronograma_ead_gravacao', 'Não foi possível atualizar a revisão do catálogo.', array( 'status' => 500 ) );
 			}
 			return array( 'rev' => $new );
