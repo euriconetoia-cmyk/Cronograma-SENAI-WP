@@ -45,3 +45,27 @@ O arquivo tests/e2e.mjs cria e altera turmas, salva catálogo e executa restaura
 
 ## Status inicial
 T-001 a T-021: NÃO EXECUTADO NESTA CONTINUIDADE.
+
+
+## Evidência real de CI — rodada 09/10/2026
+
+Branch SHA: `18b223b16f3c3daa7dd97ba452300abd548eeefd`.
+Execução do workflow CI #172: https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/37969376473
+Job release-gate: 113951775650. Resultado: **failure**.
+
+Resultados confirmados no log:
+- Instalação de Composer e dependências PHP: SUCCESS.
+- PHPCS: SUCCESS.
+- PHPStan: SUCCESS.
+- Dentro do release gate: `pnpm lint` concluiu com 0 erros e 21 avisos.
+- Dentro do release gate: `pnpm typecheck` FALHOU com exit code 2.
+- `ui/src/lib/mock.ts:70:14`: objeto mockApi não implementa `municipios`, `feriadosLocal`, `feriadosConfig` e `salvarFeriadosConfig`, exigidos pelo tipo Api.
+- `ui/src/pages/Cronograma.tsx:293:124` e `:293:138`: TS18048, `a.ref` possivelmente indefinido.
+- Empacotamento e passos seguintes do release gate: NÃO ALCANÇADOS; não marcar como aprovados.
+
+**Status revisado**:
+- T-001: FALHOU parcialmente. Instalação e lint passaram; typecheck falhou; build WP não foi alcançado neste job.
+- T-002: PARCIAL. PHPCS/PHPStan passaram, mas PHP syntax separado não está demonstrado pelo registro aqui.
+- T-003 a T-021: sem aprovação demonstrada por este job; conferir execuções próprias antes de alterar estado.
+
+**Próxima ação de correção:** abrir alteração isolada para alinhar API mock e tratar a.ref com guarda/narrowing seguro; reexecutar CI. Não usar non-null assertion sem provar invariantes. Os 21 avisos de lint devem ser catalogados separadamente, sem confundir com erros de compilação.
