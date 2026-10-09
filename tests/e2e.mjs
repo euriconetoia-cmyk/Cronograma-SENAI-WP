@@ -83,6 +83,16 @@ const beforeRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
 const sim=await U.admin.s.api('POST','importar',{...ex.j,simular:true},U.admin.n)
 if(sim.status!==200) console.log('erro simulação backup:',JSON.stringify(sim.j))
 ok(sim.status===200&&sim.j?.simulacao===true&&typeof sim.j?.confirmacao==='string','simula restauração completa ('+sim.status+')')
+// Confirmação inválida deve impedir restauração sem mutar o estado.
+const beforeInvalid = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+const denied = await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev,confirmacao:'token-invalido',simular:false},U.admin.n)
+ok(denied.status===409,'backup: restauração sem confirmação válida bloqueada (409)')
+const afterInvalid = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+ok(afterInvalid.status===200 &&
+  afterInvalid.j.crev===beforeInvalid.j.crev &&
+  JSON.stringify(afterInvalid.j.catalogo)===JSON.stringify(beforeInvalid.j.catalogo) &&
+  JSON.stringify(afterInvalid.j.turmas)===JSON.stringify(beforeInvalid.j.turmas),
+  'backup: confirmação inválida preserva catálogo, revisão e turmas')
 const restored=await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev,confirmacao:sim.j.confirmacao,simular:false},U.admin.n)
 ok(restored.status===200,'restauração completa executa ('+restored.status+')')
 const afterRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
