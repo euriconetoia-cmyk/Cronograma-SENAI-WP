@@ -52,3 +52,11 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Fluxo validado estaticamente: `preparar_importacao()` calcula o checksum normalizado e o compara antes de efetuar a importação; o novo teste amplia a verificação de comportamento no ambiente WordPress descartável.
 - CI #230: https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/38003473675 — estava em fila na consulta. CI #222 e #226 ainda em andamento. Não há aprovação confirmada deste novo teste.
 - Pendência prioritária: simular falhas transacionais intermediárias; validar atomicidade de options e dados SQL; registrar métricas de volume e tempo. Sem mudança em produção.
+
+
+## Correção prioritária: restauração com revisão obsoleta — 09/10/2026
+- GitHub CI #222, #226 e #230: todos os jobs `release-gate` concluídos com **SUCCESS**, confirmados na API de jobs. Incluem revisão de interface, ciclo da credencial sintética e rejeição de backup adulterado.
+- Código inspecionado: antes da correção, `Cronograma_EAD_Service::importar()` usava a revisão corrente do servidor ao restaurar um backup `full-state`, ignorando `body.rev`. Isso poderia sobrescrever mudanças posteriores à simulação do operador.
+- Correção `53da3708b015f2de6f067a68b3a24f86f8796a2a`: conferir `body.rev` contra revisão atual **antes** de criar backup pré-importação e começar transação; retornar conflito 409 caso divergente. Todas as modalidades passam a usar a revisão enviada no `Store::save`.
+- Teste `96815212f64e015cd6cb00b62a800bdcc1c0b693`: tentativa de restauração `full-state` com revisão obsoleta exige 409 e nenhuma alteração de turmas, catálogo ou revisão no WordPress descartável.
+- **Pendente:** aprovação do novo CI, teste de alteração concorrente no intervalo entre verificação e escrita, e injeção de falhas de transação/rollback.
