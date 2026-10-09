@@ -39,6 +39,30 @@ $sim = Cronograma_EAD_Service::importar( array_merge( $backup, array( 'simular' 
 if ( is_wp_error( $sim ) || empty( $sim['confirmacao'] ) ) {
 	WP_CLI::error( 'Simulação de restauração falhou.' );
 }
+// Injeção de falha ao iniciar transação: nenhuma modificação de catálogo ou tabelas.
+$begin_hits = 0;
+$block_begin = static function ( $sql ) use ( &$begin_hits ) {
+	if ( preg_match( '/^\\s*START\\s+TRANSACTION\\b/i', $sql ) ) {
+		++$begin_hits;
+		return 'SQL_INVALIDO_APENAS_TESTE_BEGIN';
+	}
+	return $sql;
+};
+add_filter( 'query', $block_begin );
+$begin_result = Cronograma_EAD_Service::importar( array_merge( $backup, array(
+	'simular' => false,
+	'rev' => $before['rev'],
+	'confirmacao' => $sim['confirmacao'],
+) ) );
+remove_filter( 'query', $block_begin );
+if ( 0 === $begin_hits || ! is_wp_error( $begin_result ) || 'transacao' !== $begin_result->get_error_code() ) {
+	WP_CLI::error( 'Falha forçada de START TRANSACTION não interrompeu a importação.' );
+}
+if ( $before !== Cronograma_EAD_Store::get() || $tables_before !== $read_tables() ) {
+	WP_CLI::error( 'Falha no início da transação alterou dados do sistema.' );
+}
+WP_CLI::log( 'OK falha de START TRANSACTION sem alteração de dados.' );
+
 $injected = 0;
 $injector = static function ( $sql ) use ( &$injected ) {
 	if ( preg_match( '/^\\s*INSERT\\s+INTO\\s+[`"]?\\w*ce_versoes[`"]?/i', $sql ) ) {
