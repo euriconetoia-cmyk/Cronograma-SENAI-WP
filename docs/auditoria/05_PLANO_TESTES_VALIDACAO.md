@@ -69,3 +69,13 @@ Resultados confirmados no log:
 - T-003 a T-021: sem aprovação demonstrada por este job; conferir execuções próprias antes de alterar estado.
 
 **Próxima ação de correção:** abrir alteração isolada para alinhar API mock e tratar a.ref com guarda/narrowing seguro; reexecutar CI. Não usar non-null assertion sem provar invariantes. Os 21 avisos de lint devem ser catalogados separadamente, sem confundir com erros de compilação.
+
+
+## Seguimento CI — execução #178 (09/10/2026)
+- SHA testado: `6d38128ef84e9d07b988056889505210bc42d257`
+- GitHub Actions: https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/37969783329
+- Resultado: **FALHOU**, agora durante E2E. PHPCS, PHPStan e fases anteriores do release gate foram superadas; erros anteriores de TypeScript não reapareceram.
+- Erro fatal: `tests/e2e.mjs:24` acessa `turmas[0].cursoId` quando o bootstrap da instalação recém-configurada traz zero turmas. Trata-se de pré-condição inválida no teste, não prova de defeito na criação de turmas.
+- Falha adicional reportada pelo teste: `página do cronograma pede login`. Hipótese de divergência de texto/status da página anônima; **permanece sem resolução e não deve ser ignorada**.
+- Commit `0009a377e1cce3a774adab5a506f6dc03bfd774e`: teste passou a escolher o curso no catálogo do bootstrap, com pré-condição explícita; removida a tautologia `||true` da autorização da atividade e substituída por checagem de turma permitida. Não altera código de produção.
+- Nova execução do CI e investigação da página anônima: PENDENTES. A correção não implica homologação nem gate aprovado.
