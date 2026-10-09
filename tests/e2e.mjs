@@ -9,7 +9,7 @@ class Sess{ constructor(){this.c={}}
   async api(method,path,body,nonce){ const r=await this.req('/?rest_route=/cronograma-ead/v1/'+path,{method,headers:{'Content-Type':'application/json','X-WP-Nonce':nonce},body:body===undefined?undefined:JSON.stringify(body)}); let j=null; try{j=await r.json()}catch{} return {status:r.status,j} } }
 const ids=JSON.parse(process.argv[2]); const pid=ids.cronograma
 // anônimo
-{ const s=new Sess(); const h=await s.req('/'); ok(h.status===200,'home anônima 200 (status '+h.status+')'); const p=await s.page(pid); ok(p.status===200 && /Entre com seu usuário/.test(p.html),'página do cronograma pede login') }
+{ const s=new Sess(); const h=await s.req('/'); ok(h.status===200,'home anônima 200 (status '+h.status+')'); const p=await s.page(pid); ok(p.status===200 && /ce-login-gateway/.test(p.html) && !p.cfg,'página do cronograma pede login') }
 const U={}
 for(const u of ['admin','coord_itb','aux_itb','coord_luz','consulta']){ const s=new Sess(); const st=await s.login(u); const p=await s.page(pid); ok(p.status===200&&p.cfg,`${u}: login (${st}) e página carrega com config`); U[u]={s,n:p.cfg?.nonce,perfil:p.cfg?.perfil}; }
 console.log('perfis:',Object.entries(U).map(([k,v])=>k+'='+v.perfil).join(' '))
