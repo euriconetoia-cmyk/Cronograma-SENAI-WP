@@ -88,3 +88,10 @@ Resultados confirmados no log:
 - Artefatos publicados: `cronograma-ead-2.21.0-rc1` (ID 11636096411) e `validation-evidence` (ID 11635152999). Não houve inspeção de conteúdo ou teste de implantação desses artefatos nesta atualização.
 - **Escopo da aprovação:** testes efetivamente executados pelo release gate e checks do pipeline, na revisão específica. Não comprova concorrência de catálogo, rollback sob falha injetada, cenários de escala/performance ou homologação institucional completa.
 - Estado: bloqueio de CI da etapa inicial resolvido; iniciar ensaios direcionados à integridade (T-009, T-010 e T-011), mantendo staging e banco descartável.
+
+
+## Continuidade de homologação — 09/10/2026
+- CI #306: passo `Execute full release gate` concluiu com sucesso, abrangendo o ensaio automatizado de falhas de transação e rollback. No momento consultado, ainda havia etapas de empacotamento em execução; não declarar release distribuído.
+- Teste `tests/modelos-cronograma.mjs` ampliado no commit `0ea8e63ee2bec6adf4a3c86ada600c81811c657d` para incluir explicitamente o quinto modelo, **Personalizado**, além de Técnico, Qualificação, Distribuição Diária e Aprendizagem.
+- A suíte ainda depende de CI do novo commit; cobertura matemática/contratual não equivale à homologação visual, de exportação ou dos casos reais de todas as unidades.
+- Testes T-012 a T-021 exigem dados representativos e/ou validação em staging; permanecem abertos. Não executar operação destrutiva em produção.
