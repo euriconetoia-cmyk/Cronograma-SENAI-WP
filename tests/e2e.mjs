@@ -19,6 +19,18 @@ ok(U.admin.perfil==='equipe','admin = equipe'); ok(U.coord_itb.perfil==='unidade
   const adminConfig = await U.admin.s.api('GET','feriados/config',undefined,U.admin.n)
   ok(adminConfig.status===200 && typeof adminConfig.j?.municipalConfigurado==='boolean',
     'administrador consulta configuração de feriados (200)')
+  // Somente neste banco descartável: testar gravação, leitura sem segredo e remoção.
+  const fakeKey = 'chave-e2e-sem-validade-externa'
+  const created = await U.admin.s.api('POST','feriados/config',{apiKey:fakeKey},U.admin.n)
+  ok(created.status===200 && created.j?.municipalConfigurado===true,
+    'administrador configura credencial sintética de teste')
+  const readBack = await U.admin.s.api('GET','feriados/config',undefined,U.admin.n)
+  ok(readBack.status===200 && readBack.j?.municipalConfigurado===true &&
+    !JSON.stringify(readBack.j).includes(fakeKey),
+    'consulta administrativa confirma configuração sem retornar o segredo')
+  const removed = await U.admin.s.api('POST','feriados/config',{apiKey:''},U.admin.n)
+  ok(removed.status===200 && removed.j?.municipalConfigurado===false,
+    'administrador remove credencial sintética')
   for (const role of ['coord_itb','aux_itb','consulta']) {
     const read = await U[role].s.api('GET','feriados/config',undefined,U[role].n)
     const write = await U[role].s.api('POST','feriados/config',{apiKey:''},U[role].n)
