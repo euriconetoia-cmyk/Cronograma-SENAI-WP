@@ -21,7 +21,7 @@ const bl=await boot('coord_luz'); ok(!(bl.j.turmas||[]).some(t=>t.id==='t_tst_it
 const r404=await U.coord_luz.s.api('GET','turmas/t_tst_itb/historico',undefined,U.coord_luz.n); ok(r404.status===404||r404.status===403,'coord_luz bloqueado no histórico de outra unidade ('+r404.status+')')
 const cons=await U.consulta.s.api('POST','turmas',{turma:{id:'x',cursoId:'c',unidadeId:'u_itb',nome:'x'}},U.consulta.n); ok(cons.status===403,'consulta não cria turma ('+cons.status+')')
 // fluxo
-const cursoId=turmas[0].cursoId; const ID='t_fluxo_'+Date.now()
+const cursoId=b.j?.catalogo?.cursos?.[0]?.id; ok(!!cursoId, 'catálogo contém curso inicial para testar criação'); if (!cursoId) throw new Error('Pré-condição E2E: catálogo de cursos vazio'); const ID='t_fluxo_'+Date.now()
 let cr=await U.admin.s.api('POST','turmas',{turma:{id:ID,cursoId,unidadeId:'u_itb',nome:'Turma Fluxo',inicio:'2026-05-04',obs:'',evento:'',monitorId:'',tutorId:'',coordId:'',profId:'',ambiente:'',itens:{}}},U.admin.n)
 ok(cr.status===200||cr.status===201,'admin cria turma ('+cr.status+') status '+cr.j?.status); let t=cr.j
 const A=async(u,acao,extra={})=>{ const r=await U[u].s.api('POST',`turmas/${ID}/acao`,{acao,rev:t.rev,...extra},U[u].n); if(r.status===200) t=r.j; return r }
@@ -40,7 +40,7 @@ ok((await A('admin','reabrir')).status>=400,'reabrir exige motivo')
 ok((await A('admin','reabrir',{motivo:'Mudança de calendário'})).status===200 && t.status==='validacao' && t.versao===2,'reabrir → validacao v'+t.versao)
 const h=await U.coord_itb.s.api('GET',`turmas/${ID}/historico`,undefined,U.coord_itb.n); ok(h.status===200,'unidade lê histórico ('+h.status+')')
 const old=await U.admin.s.api('POST',`turmas/${ID}`,{turma:{...t,ambiente:'Y'},rev:t.rev-1},U.admin.n); ok(old.status===409,'conflito de revisão → 409 ('+old.status+')')
-const at=await U.coord_itb.s.api('GET','atividade',undefined,U.coord_itb.n); ok(at.status===200&&Array.isArray(at.j.atividade)&&at.j.atividade.length>0&&at.j.atividade.every(x=>x.turmaId===ID||true),'atividade recente (unidade) ('+at.status+', '+(at.j.atividade||[]).length+' itens)')
+const at=await U.coord_itb.s.api('GET','atividade',undefined,U.coord_itb.n); ok(at.status===200&&Array.isArray(at.j.atividade)&&at.j.atividade.length>0&&at.j.atividade.every(x=>x.turmaId===ID || (bi.j.turmas||[]).some(t=>t.id===x.turmaId)),'atividade recente (unidade) ('+at.status+', '+(at.j.atividade||[]).length+' itens)')
 const atL=await U.coord_luz.s.api('GET','atividade',undefined,U.coord_luz.n); ok(atL.status===200&&!(atL.j.atividade||[]).some(x=>x.turmaId===ID),'atividade não vaza turmas de outra unidade')
 const atA=await U.admin.s.api('GET','atividade',undefined,U.admin.n); ok(atA.status===200&&atA.j.atividade.some(x=>x.turmaId===ID),'equipe vê atividade de todas as turmas')
 { const bt=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n); const cat=bt.j.catalogo; const orig=cat.cursos[0].modalidade; cat.cursos[0].modalidade='semipresencial'; cat.cursos[0].categoria='qualificacao'
