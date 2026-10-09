@@ -159,4 +159,10 @@ ok(!(afterRestore.j?.turmas||[]).some(x=>x.id===EXTRA),'restauração remove tur
 const restoredFlow=(afterRestore.j?.turmas||[]).find(x=>x.id===ID)
 const backedFlow=(ex.j?.turmas||[]).find(x=>x.id===ID)
 ok(!!restoredFlow&&!!backedFlow&&restoredFlow.status===backedFlow.status&&restoredFlow.versao===backedFlow.versao,'restauração preserva status e versão da turma')
+if (backedFlow?.vigente?.versao) {
+  const v = await U.admin.s.api('GET',`turmas/${ID}/versoes/${backedFlow.vigente.versao}`,undefined,U.admin.n)
+  ok(v.status===200 && !!v.j,
+    'restauração permite consultar snapshot da versão vigente ('+v.status+')')
+}
+
 console.log(fails?`\n${fails} FALHA(S)`:'\nTUDO OK')
