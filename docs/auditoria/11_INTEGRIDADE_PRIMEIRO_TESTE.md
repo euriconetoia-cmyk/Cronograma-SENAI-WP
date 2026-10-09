@@ -68,3 +68,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Correção `c383297fe413305fed785cad90a837e308ce18bc`: se salvar o snapshot de versão falhar, efetuar rollback SQL, restaurar catálogo anterior e retornar erro 500.
 - Contrato estático `ca3a37aea0cf7d39311f299ec99248fa89802d00`: exige verificar o retorno de `salvar_versao()` e presença de tratamento explícito.
 - **Pendente:** CI dos commits; teste injetando falha de INSERT na tabela de versões, testes de restauração com múltiplas versões e prova de rollback sob diferentes engines SQL.
+
+
+## Verificação de snapshot após recuperação — 09/10/2026
+- Commit `1d19e027e5e1988e0aacd0fcf7ee0b2d2db5c35b`: acrescentado teste E2E que, depois de uma restauração full-state, consulta por REST a versão vigente que existia no backup e exige resposta HTTP 200.
+- Esse cenário aumenta a cobertura de acessibilidade do histórico restaurado, mas **não** injeta falha de INSERT nem verifica rollback transacional sob erro de banco.
+- CI #242 ainda em andamento na consulta precedente; aguardar nova execução ligada ao commit e inspecionar resultado.
