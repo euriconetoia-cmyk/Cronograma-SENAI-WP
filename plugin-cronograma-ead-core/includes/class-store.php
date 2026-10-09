@@ -81,10 +81,18 @@ class Cronograma_EAD_Store {
 		if ( false === $json || strlen( $json ) > self::MAX_BYTES ) {
 			return false;
 		}
+		// O rollback SQL não desfaz automaticamente o cache de options do WordPress.
+		// Releia os valores persistidos antes de tentar restaurar o snapshot.
+		wp_cache_delete( self::OPT_DATA, 'options' );
+		wp_cache_delete( self::OPT_REV, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
 		update_option( self::OPT_DATA, $json, false );
 		update_option( self::OPT_REV, (int) $snapshot['rev'], false );
+		wp_cache_delete( self::OPT_DATA, 'options' );
+		wp_cache_delete( self::OPT_REV, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
 		delete_transient( 'cronograma_ead_lock' );
-		return true;
+		return self::get()['rev'] === (int) $snapshot['rev'];
 	}
 
 	/** Valida a estrutura do catálogo e limpa todos os textos. */
