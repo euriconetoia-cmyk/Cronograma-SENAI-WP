@@ -113,3 +113,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Correção de pré-condição E2E em `00d5863b5d79a356562f3ff231477ac788aaaf7e`: exige pelo menos uma turma exportada.
 - Diagnóstico ampliado em `e218ab36d86cc940075726120bb75154c0778fa6`: exibe código e mensagem de erro reais (ou resposta) quando a falha de INSERT não gera a condição esperada.
 - CI #264 ainda não concluído na última consulta; CI do diagnóstico precisa ser inspecionado antes da próxima correção de comportamento. A proteção de dados em produção permanece não demonstrada para falhas injetadas.
+
+
+## Diagnóstico de nomenclatura dos erros — CI #264
+- CI #264 terminou **FAILURE**. A injeção atingiu `START TRANSACTION`, mas o teste comparava `get_error_code()` a `transacao` enquanto `Service::erro()` prefixa o código com `cronograma_ead_`. Esse erro de asserção impede concluir que houve falha de rollback.
+- Commit `103dfa0019712c12e1fff2174c359404849a5119` corrige as expectativas para `cronograma_ead_transacao`, `cronograma_ead_importacao` e `cronograma_ead_restauracao`, em todos os três ensaios de injeção.
+- Novo pipeline precisa demonstrar os estados do banco após cada falha; o problema do teste de exportação foi tratado separadamente no commit `00d5863`.
