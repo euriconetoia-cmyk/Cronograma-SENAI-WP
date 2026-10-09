@@ -30,3 +30,11 @@ Estado: segurança de rota **implementada**; E2E e homologação de permissões 
 - Commit `35e70237d39550075bb3eaf5957010095caa53eb`: adicionada cobertura E2E no WordPress descartável para GET de configuração pelo administrador (200), rejeição GET/POST para coordenador, auxiliar e consulta (403), e rejeição para equipe operacional com CAP_CATALOG sem CAP_CONFIG (403). Não envia chave real; utiliza valor vazio nos testes de operações proibidas.
 - **Validação ainda pendente:** CI desse novo commit. O teste não cobre edição bem-sucedida pelo administrador nem revogação de acesso durante a sessão; devem ser testados separadamente em banco descartável.
 - Compatibilidade: a equipe operacional deixa de ter permissão para consultar a configuração; a interface deve refletir o bloqueio e informar quando é necessária intervenção administrativa.
+
+
+## Ajuste de experiência de acesso — 09/10/2026
+- `ui/src/pages/Integracoes.tsx` corrigido no commit `7f4b5e2bbe47f97ac30c88d363a6158bfef9cced`: HTTP 403 agora mostra painel informativo para o usuário sem CAP_CONFIG, em vez de rotular a integração como 'Não configurada' e oferecer formulário que não pode salvar.
+- Tratamento distinto de falha de rede/servidor e carregamento inicial, evitando confundir falha de consulta com ausência de chave.
+- Contrato estático de interface incluído no `tests/security-static.mjs`, commit `2e6cae7b1ede8d88449516f3fe73726f3d94b17e`.
+- CI #216 (teste de autorização por papéis) ainda estava em execução na última consulta desta rodada; CI dos commits de interface ainda não confirmado.
+- A validação visual em desktop/mobile, acessibilidade e fluxos reais continuam pendentes. Nenhuma alteração em produção.
