@@ -138,3 +138,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Commit `630d3255899712693b56d5db37f963695893bf67`: o cenário de rollback passa a normalizar as linhas de cada tabela por JSON e ordenar o conjunto antes da comparação. `SELECT *` sem `ORDER BY` não garante ordem, portanto comparar listas na ordem física poderia produzir falso positivo de divergência.
 - Essa mudança **não altera o mecanismo de rollback**. Caso persistam diferenças, o teste continua falhando e o diagnóstico por tabela permanece habilitado.
 - CI #286 ainda estava em execução quando consultado; validação desse novo commit ainda pendente. A divergência no COMMIT não deve ser considerada resolvida sem evidência de CI aprovado.
+
+
+## Diagnóstico CI #286: divergência localizada no catálogo
+- O log do CI #286 identificou `Diferenças após falha de COMMIT: catálogo=diferente`, sem mensagens de divergência das tabelas. O rollback SQL das tabelas parece consistente nesse ensaio, **mas o estado do catálogo não foi preservado**.
+- Commit `11ab51a7b6d1f97758e8f49eb62397e72501688e`: ampliado o diagnóstico para registrar revisão anterior/posterior e campos de catálogo divergentes (`cursos`, `pessoas`, `feriados`, `unidades`), sem expor conteúdo sensível.
+- Necessário investigar escrita de `wp_options` e cache do WordPress sob rollback transacional; nenhuma afirmação de integridade total até passar CI de injeção de falhas.
