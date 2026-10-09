@@ -18,8 +18,8 @@ class Cronograma_EAD_REST {
 			self::NS,
 			'/feriados/config',
 			array(
-				array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'feriados_config' ), 'permission_callback' => array( __CLASS__, 'can_manage_catalog' ) ),
-				array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'feriados_config_salvar' ), 'permission_callback' => array( __CLASS__, 'can_manage_catalog' ) ),
+				array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'feriados_config' ), 'permission_callback' => array( __CLASS__, 'can_configure' ) ),
+				array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'feriados_config_salvar' ), 'permission_callback' => array( __CLASS__, 'can_configure' ) ),
 			)
 		);
 		register_rest_route( self::NS, '/turmas', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'criar' ), 'permission_callback' => array( __CLASS__, 'can_create_turma' ) ) );
