@@ -32,5 +32,7 @@ IDS="$(bash tests/setup-wp.sh | tail -1)"
 node tests/e2e.mjs "$IDS"
 node tests/acessos.mjs "$IDS"
 node tests/avisos.mjs "$IDS"
+# Falha SQL deliberada somente no WordPress local de CI; verifica rollback integral.
+docker compose run --rm -v "$ROOT/tests:/tmp/ce-tests:ro" wpcli --path=/var/www/html eval-file /tmp/ce-tests/restore-rollback.php
 
 echo 'RELEASE GATE: APROVADO'
