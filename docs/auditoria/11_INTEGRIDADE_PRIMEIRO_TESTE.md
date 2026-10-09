@@ -132,3 +132,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Não se pode concluir ainda se a divergência é no catálogo, em alguma tabela ou apenas na ordenação da consulta SQL usada para comparar registros. A implementação **não está aprovada para rollback de COMMIT**.
 - Commit `b76fc027d0db1e56ad9914a54592347c75dd4676`: adiciona diagnóstico de igualdade do catálogo e, por tabela, contagens antes/depois quando a recuperação diverge, sem tornar o teste permissivo. Inspecionar próximo pipeline antes de alterar lógica transacional.
 - CI #282 ainda constava em andamento na última verificação, sem resultado final confirmado.
+
+
+## Comparação de estado sem dependência da ordem física SQL
+- Commit `630d3255899712693b56d5db37f963695893bf67`: o cenário de rollback passa a normalizar as linhas de cada tabela por JSON e ordenar o conjunto antes da comparação. `SELECT *` sem `ORDER BY` não garante ordem, portanto comparar listas na ordem física poderia produzir falso positivo de divergência.
+- Essa mudança **não altera o mecanismo de rollback**. Caso persistam diferenças, o teste continua falhando e o diagnóstico por tabela permanece habilitado.
+- CI #286 ainda estava em execução quando consultado; validação desse novo commit ainda pendente. A divergência no COMMIT não deve ser considerada resolvida sem evidência de CI aprovado.
