@@ -144,3 +144,8 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - O log do CI #286 identificou `Diferenças após falha de COMMIT: catálogo=diferente`, sem mensagens de divergência das tabelas. O rollback SQL das tabelas parece consistente nesse ensaio, **mas o estado do catálogo não foi preservado**.
 - Commit `11ab51a7b6d1f97758e8f49eb62397e72501688e`: ampliado o diagnóstico para registrar revisão anterior/posterior e campos de catálogo divergentes (`cursos`, `pessoas`, `feriados`, `unidades`), sem expor conteúdo sensível.
 - Necessário investigar escrita de `wp_options` e cache do WordPress sob rollback transacional; nenhuma afirmação de integridade total até passar CI de injeção de falhas.
+
+
+## Investigação do WordPress option cache após rollback
+- Commits `06bac1a208ef98047b8c3802155d537778c10fd4` e `8f0573fbee208867363d685ae373f8d4d9f43bbd`: o teste de COMMIT falho passa a consultar `wp_options` diretamente, registrando somente valor da revisão e hashes SHA-256 do JSON do catálogo, para distinguir estado SQL de estado observado pela API de opções/cache.
+- CI #290 e #294 ainda estavam em execução na consulta. Não foi confirmada a causa; a instrumentação não altera a lógica de recuperação e ainda exige CI e análise posterior.
