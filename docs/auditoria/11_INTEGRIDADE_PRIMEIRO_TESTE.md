@@ -86,3 +86,10 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - CI #242 e #246: **SUCCESS** verificados na API de jobs do GitHub Actions (09/10/2026). CI #250 ainda estava em execução na consulta.
 - Commit `20a887e698fb87e069a84982b4e32159e9e2d7f7` reforça teste E2E após restauração: a versão consultada deve manter o número de versão vigente e um snapshot contendo turma, curso e unidade com os IDs originais. Evita falso positivo por apenas receber HTTP 200.
 - Ainda não implementada injeção de erro SQL na tabela de versões nem teste destrutivo de rollback. Estes devem acontecer somente em banco de CI descartável.
+
+
+## Ensaio de falha SQL controlada — 09/10/2026
+- Novo teste `tests/restore-rollback.php`, commit `054772f08f3cd94bc13774c47287641309c5d44a`, protegido por verificação de WP-CLI e domínio local (`127.0.0.1`/`localhost`). Executa simulação com backup full-state, injeta SQL inválido somente no INSERT da tabela `ce_versoes`, exige erro de restauração e confere preservação do catálogo/revisão e tabelas `turmas`, `versoes`, `log` e `avisos`.
+- O teste é executado depois dos E2E em WordPress descartável pelo `tests/release-gate.sh` (commit `c4ffe59dbd10d9b65d7f3fccc8d2f533f0388340`).
+- **Pendente:** verificação pelo CI deste novo teste. Não foi executado localmente nesta rodada. Ainda são necessários ensaios de falha na limpeza, início/commit de transação e gravações de opções, com medições de recuperação.
+- O CI #250 e #254 estavam `in_progress` no último acesso, sem conclusão confirmada; os resultados dos checks desses commits devem ser avaliados separadamente.
