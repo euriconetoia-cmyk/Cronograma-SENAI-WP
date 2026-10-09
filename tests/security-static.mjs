@@ -12,6 +12,7 @@ const notify = read('plugin-cronograma-ead-core/includes/class-notify.php');
 const ui = read('ui/src/pages/Acessos.tsx');
 const schedule = read('ui/src/lib/schedule.ts');
 const cronograma = read('ui/src/pages/Cronograma.tsx');
+const integracoes = read('ui/src/pages/Integracoes.tsx');
 
 checks.push([roles.includes("set_caps( get_role( 'editor' ), array() )"), 'Editor has Cronogramas capabilities stripped']);
 checks.push([!accounts.match(/return\s+array\s*\([^)]*['\"]link['\"]/s), 'Password reset endpoint does not return link']);
@@ -28,6 +29,7 @@ checks.push([privacy.includes('wp_privacy_personal_data_exporters') && privacy.i
 checks.push([schedule.includes('if (hol.has(e.d))'), 'Holiday on Saturday is not suppressed']);
 checks.push([!cronograma.includes('workday(x.d, R.postDias, null)'), 'Grade-posting calculation no longer ignores holidays']);
 checks.push([!rest.includes("permission_callback' => '__return_true'"), 'No public REST permission callback']);
+checks.push([integracoes.includes('semPermissao') && integracoes.includes('A configuração de credenciais é exclusiva dos administradores') && integracoes.includes('configurada === null'), 'Integrations page shows role restriction and loading state instead of editable form']);
 
 for (const [ok, name] of checks) {
   console.log(`${ok ? 'OK' : 'FALHA'} ${name}`);
