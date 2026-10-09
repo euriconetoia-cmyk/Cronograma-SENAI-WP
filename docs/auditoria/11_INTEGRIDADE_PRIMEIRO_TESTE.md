@@ -80,3 +80,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Commit `1e66bf91728003c95d9edf55694243aaaeaf4fe6`: testes E2E verificam que full-state restaura `rev`, `cursoId` e `unidadeId` de uma turma conforme o backup e que a revisão global do catálogo sobe exatamente uma unidade após restauração bem-sucedida.
 - CI #242 e CI #246 permaneciam `in_progress` na última consulta e não foram classificados como aprovados nesta rodada. Novo commit requer CI independente.
 - Limites: verificação de invariantes em caminho feliz; rollback após falha injetada e manutenção integral do log histórico permanecem pendentes.
+
+
+## Verificação reforçada de snapshot de versão
+- CI #242 e #246: **SUCCESS** verificados na API de jobs do GitHub Actions (09/10/2026). CI #250 ainda estava em execução na consulta.
+- Commit `20a887e698fb87e069a84982b4e32159e9e2d7f7` reforça teste E2E após restauração: a versão consultada deve manter o número de versão vigente e um snapshot contendo turma, curso e unidade com os IDs originais. Evita falso positivo por apenas receber HTTP 200.
+- Ainda não implementada injeção de erro SQL na tabela de versões nem teste destrutivo de rollback. Estes devem acontecer somente em banco de CI descartável.
