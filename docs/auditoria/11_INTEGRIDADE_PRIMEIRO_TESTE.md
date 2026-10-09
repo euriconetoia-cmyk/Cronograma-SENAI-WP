@@ -156,3 +156,11 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Correção em `class-store.php` commits `90c3190eab065180dfa2e2579b735b1b2be901c6` e `d841f5552d723006caed6589fc221937888564d6`: `restore_snapshot()` invalida entradas do cache WordPress para dados e revisão antes e depois da restauração, relê os dados persistidos e confirma **revisão e conteúdo**.
 - Hipótese técnica: o cache de `get_option` mantinha revisão nova após rollback do banco. A causa ainda necessita confirmação por teste; CI #300 estava em progresso e foi criado antes da correção.
 - Permanecem pendentes: checar resultados da nova execução, recuperar cenário de opções parciais, validação de falha transacional real e concorrência.
+
+
+## Falha de concorrência no reempacotamento — CI #310
+- CI #310: release gate inicial concluiu com sucesso, incluindo rollback, mas o script de empacotamento repetiu E2E e observou **duas gravações simultâneas do catálogo respondendo 200/200**. O job terminou FAILURE; pacote não homologado.
+- Causa identificada por revisão de código: `get_transient()` seguido de `set_transient()` não fornece aquisição atômica de mutex. Duas requisições podem executar o par ao mesmo tempo.
+- Correção `e133ece3425d9586f06229d91c5c03406889ea44`: aquisição do mutex por `add_option` (unicidade do `option_name`), uso de `try/finally` para liberação e invalidação do cache de revisão antes da comparação.
+- Teste de contrato `3cebb6099cc2d0c68d2ec3e446c45a71faa516e4`: simula o mutex já adquirido e exige erro `cronograma_ead_ocupado` antes de liberar e permitir a escrita posterior.
+- **Pendências:** validar CI E2E com requisições realmente simultâneas e empacotamento, tratar recuperação de mutex abandonado por interrupção abrupta e tratar atualização parcial entre `OPT_DATA` e `OPT_REV`. Não implantar em produção antes disso.
