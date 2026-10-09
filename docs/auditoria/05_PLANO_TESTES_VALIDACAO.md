@@ -79,3 +79,12 @@ Resultados confirmados no log:
 - Falha adicional reportada pelo teste: `página do cronograma pede login`. Hipótese de divergência de texto/status da página anônima; **permanece sem resolução e não deve ser ignorada**.
 - Commit `0009a377e1cce3a774adab5a506f6dc03bfd774e`: teste passou a escolher o curso no catálogo do bootstrap, com pré-condição explícita; removida a tautologia `||true` da autorização da atividade e substituída por checagem de turma permitida. Não altera código de produção.
 - Nova execução do CI e investigação da página anônima: PENDENTES. A correção não implica homologação nem gate aprovado.
+
+
+## Resultado confirmado — CI #188 (09/10/2026)
+- SHA de execução: `8b1109f15b0522fcca25fc75e2383eca13623e8d`.
+- URL: https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/37970606486
+- Job `release-gate`: **SUCCESS**. Etapas de instalação, PHPCS, PHPStan, `tests/release-gate.sh`, empacotamento e upload de artefatos: **SUCCESS** segundo resumo de jobs da API GitHub.
+- Artefatos publicados: `cronograma-ead-2.21.0-rc1` (ID 11636096411) e `validation-evidence` (ID 11635152999). Não houve inspeção de conteúdo ou teste de implantação desses artefatos nesta atualização.
+- **Escopo da aprovação:** testes efetivamente executados pelo release gate e checks do pipeline, na revisão específica. Não comprova concorrência de catálogo, rollback sob falha injetada, cenários de escala/performance ou homologação institucional completa.
+- Estado: bloqueio de CI da etapa inicial resolvido; iniciar ensaios direcionados à integridade (T-009, T-010 e T-011), mantendo staging e banco descartável.
