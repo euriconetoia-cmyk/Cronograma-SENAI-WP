@@ -6,6 +6,7 @@ cd "$ROOT"
 bash tests/php-syntax.sh
 php tests/unit-rules.php
 php tests/catalog-contract.php
+php tests/catalog-integrity.php
 node tests/calendar-contract.mjs
 node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-profiles.mjs
 node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-multimodel.mjs
