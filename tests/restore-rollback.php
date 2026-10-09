@@ -82,7 +82,15 @@ remove_filter( 'query', $block_commit );
 if ( 0 === $commit_hits || ! is_wp_error( $commit_result ) || 'cronograma_ead_importacao' !== $commit_result->get_error_code() ) {
 	WP_CLI::error( 'Falha forçada de COMMIT não interrompeu corretamente a importação.' );
 }
-if ( $before !== Cronograma_EAD_Store::get() || $tables_before !== $read_tables() ) {
+$after_commit_catalog = Cronograma_EAD_Store::get();
+$after_commit_tables = $read_tables();
+if ( $before !== $after_commit_catalog || $tables_before !== $after_commit_tables ) {
+	WP_CLI::warning( 'Diferenças após falha de COMMIT: catálogo=' . ( $before === $after_commit_catalog ? 'igual' : 'diferente' ) );
+	foreach ( $tables as $table_name ) {
+		if ( $tables_before[ $table_name ] !== $after_commit_tables[ $table_name ] ) {
+			WP_CLI::warning( 'Diferença na tabela ' . $table_name . ': antes=' . count( $tables_before[ $table_name ] ) . ', depois=' . count( $after_commit_tables[ $table_name ] ) );
+		}
+	}
 	WP_CLI::error( 'Falha no COMMIT não preservou integralmente os dados.' );
 }
 WP_CLI::log( 'OK falha de COMMIT com rollback íntegro.' );
