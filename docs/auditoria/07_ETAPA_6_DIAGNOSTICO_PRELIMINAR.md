@@ -34,3 +34,44 @@ Etapa 6 somente concluída com baseline reproduzível, testes de carga e interfa
 
 ## Restrições
 Não refatorar ou alterar comportamento antes das etapas 7, 8, matriz P0-P3 e plano de implementação; não inventar metas de desempenho. Este arquivo é um registro intermediário, não homologação e não release.
+
+
+## Segunda rodada de auditoria estática (09/10/2026)
+
+Arquivos adicionais inspecionados: ui/src/lib/api.ts, ui/vite.config.ts, ui/vite.single.config.ts; class-service.php nas regiões de atividade e sincronização de feriados.
+
+### Detalhamento de evidências
+
+**PERF-004: invalidação de atividade.** Em ui/src/pages/Inicio.tsx, o efeito que consulta api.atividade() depende de `[api, d.turmas]`. Em ui/src/lib/store.tsx, operações de edição substituem a coleção por um novo objeto. Existe, portanto, um caminho verificável para refetch de atividade após mudanças locais, mesmo sem alteração relevante no histórico. Diagnóstico de redundância potencial, ainda sem quantificação de chamadas.
+
+**PERF-008: frequência e falhas da sincronização.** Em class-service.php, sincronizar_feriados_automaticos() verifica o transient cronograma_ead_auto_feriados_ok. Se ausente, consulta os anos atual e seguinte, e marca o transient por 12 horas. A operação pode ser executada no bootstrap da equipe após expiração do cache. Ponto de atenção adicional: o transient de sucesso é definido ao final mesmo se consultas externas falharem; investigar impacto no frescor dos feriados. Não confundir cache de 12 horas da sincronização com os caches das consultas individuais.
+
+**PERF-010: atividade e consultas adicionais.** class-service.php::atividade() consulta até 80 entradas de log por DB::atividade(80) e, para cada turma distinta, consulta DB::get(turma_id) uma vez, guardando o resultado num cache local. O limite superior teórico dessa rotina é uma consulta do log e até 80 consultas por turma distinta, antes de considerar outras consultas de autenticação; o total real pode ser menor. Medir contagens SQL antes de otimizar. Não há cache persistente de autorização nessa função.
+
+**PERF-011: visibilidade e política de cache HTTP.** ui/src/lib/api.ts usa fetch de mesma origem e nonce, com mensagens de erro de rede e sessão expirada; nesta camada não há cache explícito, deduplicação ou cancelamento de solicitações. Isso, isoladamente, não prova ausência de caching no WordPress ou na infraestrutura.
+
+**PERF-012: variantes de build.** O build Vite padrão e o build WordPress são configurações distintas. A configuração do WordPress desabilita divisão de CSS e usa inlineDynamicImports para entregar app.js em IIFE único. Qualquer sugestão de lazy loading precisa primeiro verificar a compatibilidade do carregamento WordPress e dos scripts existentes.
+
+### Roteiro de medição reproduzível
+
+| Cenário | Instrumentação | Evidência mínima |
+|---|---|---|
+| Primeiro acesso equipe | Browser DevTools Network e PHP timings | Requests, payload bootstrap, duração e percentis de várias execuções |
+| Primeiro acesso unidade | Mesma instrumentação, com perfil restrito | Payload e duração por escopo, sem vazamento de dados |
+| Atividade após edição | Network + trilha de eventos | Número de GET atividade por ação; separar edição local de salvamento |
+| 80 logs com turmas distintas | Query Monitor ou SAVEQUERIES controlado | SQL count e duração de DB::get por turma |
+| Feriados com cache válido | Logs temporários de duração + Network | Tempo de bootstrap, chamadas externas |
+| Feriados com cache expirado | Ambiente isolado, falha simulada da API | Tempo, erro, intervalo até nova tentativa e persistência de cache |
+| Build WordPress | pnpm build:wp + contagem gzip/brotli | Peso do app.js e seu tempo de parse/execução |
+| 10/100/500/1000 turmas sintéticas | Browser Profiler, medição REST e EXPLAIN | Tempo, memória, renderizações e custo SQL |
+
+Não registrar p50/p95 ou limites de aceitação até coletar amostras reais e definir o ambiente. Para testes de API e escrita, usar staging e dados sintéticos.
+
+### Hipóteses a validar na próxima coleta
+1. Reduzir refetch de atividade sem apresentar histórico desatualizado.
+2. Evitar consulta N+1 de atividade preservando filtros e autorização por unidade.
+3. Separar sincronização de feriados do caminho crítico do bootstrap, com tratamento de falhas e atualização segura, somente se medição justificar.
+4. Examinar estratégias de cache/paginação e custo de clonagem React, verificando compatibilidade com o fluxo de revisões e a experiência de edição.
+
+### Estado atualizado
+A auditoria estática evoluiu. Não foram realizados benchmarks, testes SQL EXPLAIN, perfis React, builds locais ou testes funcionais em WordPress. A Etapa 6 permanece ABERTA; não há aprovação para refatorar ou publicar release.
