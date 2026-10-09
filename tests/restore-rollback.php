@@ -30,7 +30,15 @@ $read_tables = static function () use ( $tables ) {
 	$all = array();
 	foreach ( $tables as $name ) {
 		$table = Cronograma_EAD_DB::t( $name );
-		$all[ $name ] = $wpdb->get_results( "SELECT * FROM $table", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL
+		$rows = $wpdb->get_results( "SELECT * FROM $table", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL
+		if ( ! is_array( $rows ) ) {
+			WP_CLI::error( 'Falha ao consultar tabela ' . $name );
+		}
+		// A ordem física de SELECT sem ORDER BY não é garantida pelo SQL.
+		// Ordenar representações canônicas permite comparar conteúdo real.
+		$normalized = array_map( 'wp_json_encode', $rows );
+		sort( $normalized, SORT_STRING );
+		$all[ $name ] = $normalized;
 	}
 	return $all;
 };
