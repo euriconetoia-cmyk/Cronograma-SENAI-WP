@@ -92,7 +92,8 @@ class Cronograma_EAD_Store {
 		wp_cache_delete( self::OPT_REV, 'options' );
 		wp_cache_delete( 'alloptions', 'options' );
 		delete_transient( 'cronograma_ead_lock' );
-		return self::get()['rev'] === (int) $snapshot['rev'];
+		$restored = self::get();
+		return $restored['rev'] === (int) $snapshot['rev'] && $restored['data'] === $snapshot['data'];
 	}
 
 	/** Valida a estrutura do catálogo e limpa todos os textos. */
