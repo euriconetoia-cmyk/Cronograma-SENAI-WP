@@ -105,3 +105,11 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Commit `d55b60f0cd9c5cce5814549f213405b35993532b`: estendido o teste isolado `tests/restore-rollback.php` para injetar SQL inválido em `COMMIT`, exigir erro de importação, confirmar que o gancho atingiu o comando e comparar catálogo e tabelas (`turmas`, `versoes`, `log`, `avisos`) com o estado anterior.
 - Este cenário **ainda não foi aprovado pelo CI**. O teste depende do banco descartável; não usar em staging ou produção.
 - CI #260 e #264 continuavam `in_progress` após a consulta. Não concluir a etapa de integridade antes da aprovação de cenário de histórico, START TRANSACTION e COMMIT.
+
+
+## CI #260 — falhas efetivamente verificadas
+- CI #260 terminou com **FAILURE**. Log: o teste E2E exigia `ex.j.turmas.length>=2`, embora a fixture descartável pudesse conter uma única turma; o erro `FALHA backup exporta` ocorreu.
+- O teste de injeção de SQL atingiu o INSERT em `ce_versoes` e gerou erro SQL no MariaDB, mas o teste terminou com `A restauração deveria ter sido interrompida pelo erro do histórico.`. A causa exata do desvio ainda não foi determinada; **não considerar rollback aprovado**.
+- Correção de pré-condição E2E em `00d5863b5d79a356562f3ff231477ac788aaaf7e`: exige pelo menos uma turma exportada.
+- Diagnóstico ampliado em `e218ab36d86cc940075726120bb75154c0778fa6`: exibe código e mensagem de erro reais (ou resposta) quando a falha de INSERT não gera a condição esperada.
+- CI #264 ainda não concluído na última consulta; CI do diagnóstico precisa ser inspecionado antes da próxima correção de comportamento. A proteção de dados em produção permanece não demonstrada para falhas injetadas.
