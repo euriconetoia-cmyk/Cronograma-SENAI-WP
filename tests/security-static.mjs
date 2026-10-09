@@ -24,6 +24,7 @@ checks.push([!ui.includes('Copiar só o link') && !ui.includes('cred.link'), 'Fr
 checks.push([store.includes('256 * 1024') || store.includes('262144'), 'Turma payload has size limit']);
 checks.push([service.includes('Cronograma_EAD_DB::begin()') && service.includes('Cronograma_EAD_DB::rollback()'), 'Critical service operations use transactions']);
 checks.push([service.includes("'simular'") && service.includes('preparar_importacao'), 'Import supports preflight/simulation']);
+checks.push([/if\s*\(\s*!\s*Cronograma_EAD_DB::salvar_versao\(/.test(service) && service.includes('Falha ao restaurar o histórico de versões. Nada foi alterado.'), 'Full backup restoration verifies history insert and aborts on failure']);
 checks.push([notify.includes('Cronograma_EAD_Accounts::inativo'), 'Inactive users are filtered from notifications']);
 checks.push([privacy.includes('wp_privacy_personal_data_exporters') && privacy.includes('wp_privacy_personal_data_erasers'), 'WordPress privacy exporter/eraser integrated']);
 checks.push([schedule.includes('if (hol.has(e.d))'), 'Holiday on Saturday is not suppressed']);
