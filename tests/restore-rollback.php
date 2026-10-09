@@ -96,6 +96,9 @@ if ( $before !== $after_commit_catalog || $tables_before !== $after_commit_table
 	WP_CLI::warning( 'Diferenças após falha de COMMIT: catálogo=' . ( $before === $after_commit_catalog ? 'igual' : 'diferente' ) );
 	if ( $before !== $after_commit_catalog ) {
 		WP_CLI::warning( 'Revisão anterior=' . $before['rev'] . '; revisão posterior=' . $after_commit_catalog['rev'] );
+		$db_rev = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM ' . $wpdb->options . ' WHERE option_name = %s', Cronograma_EAD_Store::OPT_REV ) );
+		$db_data = $wpdb->get_var( $wpdb->prepare( 'SELECT option_value FROM ' . $wpdb->options . ' WHERE option_name = %s', Cronograma_EAD_Store::OPT_DATA ) );
+		WP_CLI::warning( 'Opções no banco após rollback: rev=' . (string) $db_rev . '; hash catálogo=' . hash( 'sha256', (string) $db_data ) . '; hash esperado=' . hash( 'sha256', (string) wp_json_encode( $before['data'] ) ) );
 		foreach ( array( 'cursos', 'pessoas', 'feriados', 'unidades' ) as $field ) {
 			if ( $before['data'][ $field ] !== $after_commit_catalog['data'][ $field ] ) {
 				WP_CLI::warning( 'Diferença no campo do catálogo: ' . $field . '; contagens antes/depois=' . count( $before['data'][ $field ] ) . '/' . count( $after_commit_catalog['data'][ $field ] ) );
