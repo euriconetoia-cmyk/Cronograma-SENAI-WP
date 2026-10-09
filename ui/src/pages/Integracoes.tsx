@@ -4,16 +4,24 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Field, Panel } from '@/components/Fields'
 import { useStore } from '@/lib/store'
+import { ApiError } from '@/lib/api'
 
 export function IntegracoesPage() {
   const { api } = useStore()
   const [apiKey, setApiKey] = useState('')
   const [configurada, setConfigurada] = useState<boolean | null>(null)
   const [mostrar, setMostrar] = useState(false)
+  const [semPermissao, setSemPermissao] = useState(false)
+  const [erroConsulta, setErroConsulta] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
   useEffect(() => {
-    void api.feriadosConfig().then(r => setConfigurada(r.municipalConfigurado)).catch(() => setConfigurada(false))
+    void api.feriadosConfig()
+      .then(r => { setConfigurada(r.municipalConfigurado); setSemPermissao(false); setErroConsulta(false) })
+      .catch(e => {
+        if (e instanceof ApiError && e.status === 403) setSemPermissao(true)
+        else setErroConsulta(true)
+      })
   }, [api])
 
   const salvar = async () => {
@@ -44,6 +52,17 @@ export function IntegracoesPage() {
     <div className="flex flex-col gap-4">
       <Panel title="Integrações">
         <p className="mb-4 max-w-3xl text-sm text-muted-foreground">Configurações técnicas de serviços externos usados pelo sistema. Essas credenciais não aparecem na tela operacional de Feriados.</p>
+        {semPermissao ? (
+          <div role="status" className="rounded-xl border bg-secondary/40 p-4 text-sm">
+            A configuração de credenciais é exclusiva dos administradores do sistema. Solicite apoio à administração para consultar ou alterar a integração de feriados municipais.
+          </div>
+        ) : erroConsulta ? (
+          <div role="alert" className="rounded-xl border bg-secondary/40 p-4 text-sm">
+            Não foi possível consultar o estado da integração. Recarregue a página e tente novamente.
+          </div>
+        ) : configurada === null ? (
+          <div role="status" className="rounded-xl border bg-secondary/40 p-4 text-sm">Consultando configuração da integração…</div>
+        ) : (
         <div className="rounded-xl border bg-card p-4">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <KeyRound size={17} className="text-primary"/>
@@ -62,6 +81,7 @@ export function IntegracoesPage() {
             {configurada && <Button type="button" variant="ghost" disabled={salvando} onClick={() => void remover()}>Remover chave</Button>}
           </div>
         </div>
+        )}
       </Panel>
     </div>
   )
