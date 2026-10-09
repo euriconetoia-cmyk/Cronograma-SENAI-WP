@@ -63,6 +63,30 @@ if ( $before !== Cronograma_EAD_Store::get() || $tables_before !== $read_tables(
 }
 WP_CLI::log( 'OK falha de START TRANSACTION sem alteração de dados.' );
 
+// Força falha na confirmação da transação, após as gravações do backup.
+$commit_hits = 0;
+$block_commit = static function ( $sql ) use ( &$commit_hits ) {
+	if ( preg_match( '/^\\s*COMMIT\\b/i', $sql ) ) {
+		++$commit_hits;
+		return 'SQL_INVALIDO_APENAS_TESTE_COMMIT';
+	}
+	return $sql;
+};
+add_filter( 'query', $block_commit );
+$commit_result = Cronograma_EAD_Service::importar( array_merge( $backup, array(
+	'simular' => false,
+	'rev' => $before['rev'],
+	'confirmacao' => $sim['confirmacao'],
+) ) );
+remove_filter( 'query', $block_commit );
+if ( 0 === $commit_hits || ! is_wp_error( $commit_result ) || 'importacao' !== $commit_result->get_error_code() ) {
+	WP_CLI::error( 'Falha forçada de COMMIT não interrompeu corretamente a importação.' );
+}
+if ( $before !== Cronograma_EAD_Store::get() || $tables_before !== $read_tables() ) {
+	WP_CLI::error( 'Falha no COMMIT não preservou integralmente os dados.' );
+}
+WP_CLI::log( 'OK falha de COMMIT com rollback íntegro.' );
+
 $injected = 0;
 $injector = static function ( $sql ) use ( &$injected ) {
 	if ( preg_match( '/^\\s*INSERT\\s+INTO\\s+[`"]?\\w*ce_versoes[`"]?/i', $sql ) ) {
