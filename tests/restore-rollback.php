@@ -16,6 +16,7 @@ if ( ! $admin ) {
 	WP_CLI::error( 'Administrador de testes inexistente.' );
 }
 wp_set_current_user( $admin->ID );
+global $wpdb;
 $before = Cronograma_EAD_Store::get();
 $backup = Cronograma_EAD_Service::exportar();
 $with_versions = array_filter( $backup['turmas'], static function ( $t ) {
