@@ -55,7 +55,7 @@ $begin_result = Cronograma_EAD_Service::importar( array_merge( $backup, array(
 	'confirmacao' => $sim['confirmacao'],
 ) ) );
 remove_filter( 'query', $block_begin );
-if ( 0 === $begin_hits || ! is_wp_error( $begin_result ) || 'transacao' !== $begin_result->get_error_code() ) {
+if ( 0 === $begin_hits || ! is_wp_error( $begin_result ) || 'cronograma_ead_transacao' !== $begin_result->get_error_code() ) {
 	WP_CLI::error( 'Falha forçada de START TRANSACTION não interrompeu a importação.' );
 }
 if ( $before !== Cronograma_EAD_Store::get() || $tables_before !== $read_tables() ) {
@@ -79,7 +79,7 @@ $commit_result = Cronograma_EAD_Service::importar( array_merge( $backup, array(
 	'confirmacao' => $sim['confirmacao'],
 ) ) );
 remove_filter( 'query', $block_commit );
-if ( 0 === $commit_hits || ! is_wp_error( $commit_result ) || 'importacao' !== $commit_result->get_error_code() ) {
+if ( 0 === $commit_hits || ! is_wp_error( $commit_result ) || 'cronograma_ead_importacao' !== $commit_result->get_error_code() ) {
 	WP_CLI::error( 'Falha forçada de COMMIT não interrompeu corretamente a importação.' );
 }
 if ( $before !== Cronograma_EAD_Store::get() || $tables_before !== $read_tables() ) {
@@ -105,7 +105,7 @@ remove_filter( 'query', $injector );
 if ( 0 === $injected ) {
 	WP_CLI::error( 'O mecanismo de injeção não atingiu o INSERT do histórico.' );
 }
-if ( ! is_wp_error( $result ) || 'restauracao' !== $result->get_error_code() ) {
+if ( ! is_wp_error( $result ) || 'cronograma_ead_restauracao' !== $result->get_error_code() ) {
 	WP_CLI::error( 'A restauração deveria ter sido interrompida pelo erro do histórico. Resultado: ' . ( is_wp_error( $result ) ? $result->get_error_code() . ': ' . $result->get_error_message() : wp_json_encode( $result ) ) );
 }
 $after = Cronograma_EAD_Store::get();
