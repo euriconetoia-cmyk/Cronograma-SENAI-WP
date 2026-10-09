@@ -99,3 +99,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Commit `761e9de221443959c519f280a086f013dece4448`: ampliado `tests/restore-rollback.php` com injeção de erro SQL em `START TRANSACTION`. Critérios: importação devolve `WP_Error` código `transacao`, SQL inválido atingiu o ponto desejado e catálogo + tabelas não mudaram.
 - O teste ocorre exclusivamente no WordPress descartável do Release Gate e não substitui avaliação de atomicidade sob concorrência real.
 - CI #260 permanecia em progresso no último check; novo teste depende de nova execução após o commit. Pendentes falha no COMMIT, update_option parcial e homologação de múltiplos perfis.
+
+
+## Ensaio adicional: falha no COMMIT (09/10/2026)
+- Commit `d55b60f0cd9c5cce5814549f213405b35993532b`: estendido o teste isolado `tests/restore-rollback.php` para injetar SQL inválido em `COMMIT`, exigir erro de importação, confirmar que o gancho atingiu o comando e comparar catálogo e tabelas (`turmas`, `versoes`, `log`, `avisos`) com o estado anterior.
+- Este cenário **ainda não foi aprovado pelo CI**. O teste depende do banco descartável; não usar em staging ou produção.
+- CI #260 e #264 continuavam `in_progress` após a consulta. Não concluir a etapa de integridade antes da aprovação de cenário de histórico, START TRANSACTION e COMMIT.
