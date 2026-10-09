@@ -74,3 +74,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Commit `1d19e027e5e1988e0aacd0fcf7ee0b2d2db5c35b`: acrescentado teste E2E que, depois de uma restauração full-state, consulta por REST a versão vigente que existia no backup e exige resposta HTTP 200.
 - Esse cenário aumenta a cobertura de acessibilidade do histórico restaurado, mas **não** injeta falha de INSERT nem verifica rollback transacional sob erro de banco.
 - CI #242 ainda em andamento na consulta precedente; aguardar nova execução ligada ao commit e inspecionar resultado.
+
+
+## Contratos de restauração estendidos
+- Commit `1e66bf91728003c95d9edf55694243aaaeaf4fe6`: testes E2E verificam que full-state restaura `rev`, `cursoId` e `unidadeId` de uma turma conforme o backup e que a revisão global do catálogo sobe exatamente uma unidade após restauração bem-sucedida.
+- CI #242 e CI #246 permaneciam `in_progress` na última consulta e não foram classificados como aprovados nesta rodada. Novo commit requer CI independente.
+- Limites: verificação de invariantes em caminho feliz; rollback após falha injetada e manutenção integral do log histórico permanecem pendentes.
