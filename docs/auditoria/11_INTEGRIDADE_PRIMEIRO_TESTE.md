@@ -45,3 +45,10 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Identificação: `Cronograma_EAD_Service::importar()` executava `Cronograma_EAD_DB::begin()` sem inspecionar retorno; se START TRANSACTION falhasse, haveria risco de continuar a escrita sem garantia transacional.
 - Correção `a10e4fdbca3c627d77bc080575bfbfd76461ef70`: abortar a operação com HTTP 500 e mensagem de erro antes de alterar o catálogo caso o início da transação falhe.
 - **Pendente:** verificar CI do commit de correção e desenvolver injeção efetiva de falha de START TRANSACTION e de erros intermediários de DB/opções. Esta alteração não prova que restauração inteira é atômica em todos os modos.
+
+
+## Teste adicional: adulteração de backup e checksum
+- Commit `b74e92796fb9998b53fa19a9f2d11b02d6a0bd28` adiciona ao E2E a alteração sintética do nome de um curso **após** a exportação, sem recalcular o checksum. Simulação de importação deve responder HTTP 422 com erro de checksum; catálogo, revisão e turmas devem permanecer idênticos.
+- Fluxo validado estaticamente: `preparar_importacao()` calcula o checksum normalizado e o compara antes de efetuar a importação; o novo teste amplia a verificação de comportamento no ambiente WordPress descartável.
+- CI #230: https://github.com/euriconetoia-cmyk/Cronograma-SENAI-WP/actions/runs/38003473675 — estava em fila na consulta. CI #222 e #226 ainda em andamento. Não há aprovação confirmada deste novo teste.
+- Pendência prioritária: simular falhas transacionais intermediárias; validar atomicidade de options e dados SQL; registrar métricas de volume e tempo. Sem mudança em produção.
