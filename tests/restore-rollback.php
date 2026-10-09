@@ -106,7 +106,7 @@ if ( 0 === $injected ) {
 	WP_CLI::error( 'O mecanismo de injeção não atingiu o INSERT do histórico.' );
 }
 if ( ! is_wp_error( $result ) || 'restauracao' !== $result->get_error_code() ) {
-	WP_CLI::error( 'A restauração deveria ter sido interrompida pelo erro do histórico.' );
+	WP_CLI::error( 'A restauração deveria ter sido interrompida pelo erro do histórico. Resultado: ' . ( is_wp_error( $result ) ? $result->get_error_code() . ': ' . $result->get_error_message() : wp_json_encode( $result ) ) );
 }
 $after = Cronograma_EAD_Store::get();
 if ( $before !== $after ) {
