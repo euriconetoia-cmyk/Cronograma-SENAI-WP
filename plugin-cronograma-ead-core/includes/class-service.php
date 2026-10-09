@@ -1064,15 +1064,17 @@ class Cronograma_EAD_Service {
 		if ( ! isset( $body['rev'] ) ) {
 			return self::erro( 'invalido', 'Revisão atual ausente.', 400 );
 		}
-		$pre_backup = self::exportar();
 		$catalog_before = Cronograma_EAD_Store::get();
+		if ( (int) $body['rev'] !== (int) $catalog_before['rev'] ) {
+			return self::erro( 'conflito', 'O catálogo mudou desde a simulação. Recarregue os dados e simule novamente antes de restaurar.', 409 );
+		}
+		$pre_backup = self::exportar();
 		update_option( 'cronograma_ead_pre_import_backup', wp_json_encode( $pre_backup ), false );
 		update_option( 'cronograma_ead_pre_import_backup_at', gmdate( 'c' ), false );
 		if ( ! Cronograma_EAD_DB::begin() ) {
 			return self::erro( 'transacao', 'Não foi possível iniciar a transação da importação. Nada foi alterado.', 500 );
 		}
-		$rev_restauracao = ! empty( $prep['fullRestore'] ) ? (int) $catalog_before['rev'] : (int) $body['rev'];
-		$saved = Cronograma_EAD_Store::save( $prep['catalogo'], $rev_restauracao );
+		$saved = Cronograma_EAD_Store::save( $prep['catalogo'], (int) $body['rev'] );
 		if ( is_wp_error( $saved ) ) {
 			Cronograma_EAD_DB::rollback();
 			return $saved;
