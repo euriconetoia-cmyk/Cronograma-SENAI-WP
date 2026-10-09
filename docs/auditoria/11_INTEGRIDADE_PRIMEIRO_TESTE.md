@@ -93,3 +93,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - O teste é executado depois dos E2E em WordPress descartável pelo `tests/release-gate.sh` (commit `c4ffe59dbd10d9b65d7f3fccc8d2f533f0388340`).
 - **Pendente:** verificação pelo CI deste novo teste. Não foi executado localmente nesta rodada. Ainda são necessários ensaios de falha na limpeza, início/commit de transação e gravações de opções, com medições de recuperação.
 - O CI #250 e #254 estavam `in_progress` no último acesso, sem conclusão confirmada; os resultados dos checks desses commits devem ser avaliados separadamente.
+
+
+## Ensaio adicional: falha ao iniciar transação
+- Commit `761e9de221443959c519f280a086f013dece4448`: ampliado `tests/restore-rollback.php` com injeção de erro SQL em `START TRANSACTION`. Critérios: importação devolve `WP_Error` código `transacao`, SQL inválido atingiu o ponto desejado e catálogo + tabelas não mudaram.
+- O teste ocorre exclusivamente no WordPress descartável do Release Gate e não substitui avaliação de atomicidade sob concorrência real.
+- CI #260 permanecia em progresso no último check; novo teste depende de nova execução após o commit. Pendentes falha no COMMIT, update_option parcial e homologação de múltiplos perfis.
