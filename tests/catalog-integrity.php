@@ -15,7 +15,7 @@ function sanitize_text_field( $value ) { return trim( strip_tags( (string) $valu
 $test_options = array();
 $test_transients = array();
 function get_option( $name, $fallback = false ) { global $test_options; return $test_options[ $name ] ?? $fallback; }
-function update_option( $name, $value, $autoload = null ) { global $test_options; $test_options[ $name ] = $value; return true; }
+function update_option( $name, $value, $autoload = null ) { global $test_options, $fail_option; if ( $fail_option === $name ) return false; $test_options[ $name ] = $value; return true; }
 function add_option( $name, $value, $deprecated = '', $autoload = false ) { global $test_options; if ( array_key_exists( $name, $test_options ) ) { return false; } $test_options[ $name ] = $value; return true; }
 function delete_option( $name ) { global $test_options; unset( $test_options[ $name ] ); return true; }
 function wp_cache_delete( $key, $group = '' ) { return true; }
@@ -39,6 +39,11 @@ ensure( is_wp_error( $blocked ) && 'cronograma_ead_ocupado' === $blocked->code, 
 delete_option( $lock_name );
 $second = Cronograma_EAD_Store::save( $catalog, 1 );
 ensure( ! is_wp_error( $second ) && 2 === $second['rev'], 'A revisão atual deve permitir atualização.' );
+$fail_option = Cronograma_EAD_Store::OPT_REV;
+$failed = Cronograma_EAD_Store::save( array_merge( $catalog, array( 'feriados' => array( array( '2026-10-09', 'Teste' ) ) ) ), 2 );
+ensure( is_wp_error( $failed ) && 'cronograma_ead_gravacao' === $failed->code, 'Falha parcial na revisão deve retornar erro.' );
+$fail_option = null;
+ensure( Cronograma_EAD_Store::get()['data'] === $catalog && Cronograma_EAD_Store::get()['rev'] === 2, 'Falha parcial deve recuperar dados anteriores.' );
 $read = Cronograma_EAD_Store::get();
 ensure( 2 === $read['rev'] && $read['data'] === $catalog, 'Catálogo e revisão devem concordar no fluxo sequencial.' );
 echo "OK catalog-integrity: gravação sequencial, conflito de revisão e leitura\n";
