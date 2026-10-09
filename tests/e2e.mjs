@@ -108,6 +108,20 @@ const atA=await U.admin.s.api('GET','atividade',undefined,U.admin.n); ok(atA.sta
 }
 const ex=await U.admin.s.api('GET','exportar',undefined,U.admin.n); ok(ex.status===200&&ex.j.turmas.length>=2,'backup exporta')
 ok(ex.j?.schemaVersion===4&&ex.j?.backupMode==='full-state'&&typeof ex.j?.checksum==='string','backup usa formato completo v4')
+// Backup adulterado não deve passar nem pela simulação, preservando todo o estado.
+{
+  const snapshot = await boot('admin')
+  const badBackup = structuredClone(ex.j)
+  badBackup.catalogo.cursos[0].nome = 'Conteúdo adulterado no backup'
+  const bad = await U.admin.s.api('POST','importar',{...badBackup,simular:true},U.admin.n)
+  ok(bad.status===422 && bad.j?.code?.includes('checksum'),
+    'backup: checksum detecta modificação de conteúdo (422)')
+  const unchanged = await boot('admin')
+  ok(unchanged.status===200 && unchanged.j.crev===snapshot.j.crev &&
+    JSON.stringify(unchanged.j.catalogo)===JSON.stringify(snapshot.j.catalogo) &&
+    JSON.stringify(unchanged.j.turmas)===JSON.stringify(snapshot.j.turmas),
+    'backup adulterado não altera catálogo, revisão ou turmas')
+}
 const exu=await U.coord_itb.s.api('GET','exportar',undefined,U.coord_itb.n); ok(exu.status===403,'unidade não exporta backup ('+exu.status+')')
 
 // restauração completa: cria um dado depois do backup, simula e volta exatamente ao estado salvo
