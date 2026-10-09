@@ -290,7 +290,7 @@ function CronogramaAberto() {
                   {(a.ref || a.campo) && (
                     <span className="flex shrink-0 gap-1.5">
                       <button type="button" onClick={() => irAoErro(a)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ir ao erro</button>
-                      {!lAj && a.ref?.tipo === 'presencial' && <button type="button" onClick={() => corrigir(`presencial:${a.ref.item}:${a.ref.ix}`)} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
+                      {!lAj && a.ref?.tipo === 'presencial' && <button type="button" onClick={() => { const ref = a.ref; if (ref?.tipo === 'presencial') corrigir(`presencial:${ref.item}:${ref.ix}`) }} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
                     </span>
                   )}
                 </li>
