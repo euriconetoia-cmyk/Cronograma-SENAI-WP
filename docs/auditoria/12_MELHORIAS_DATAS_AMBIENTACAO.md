@@ -33,3 +33,11 @@
 - Regressões: `tests/end-date-ambientacao.mjs` testa os cinco modelos, carga horária integral e limites de intervalo; `tests/catalog-contract.php` verifica a sanitização e a rejeição de datas inválidas.
 - Limite funcional: o redistribuidor conservador não compacta duração pedagógica, não muda horas, não resolve intervalos inviáveis e pode deixar folgas explícitas. Deve apresentar impedimento, não falsificar término.
 - **Homologação:** mudanças implementadas em desenvolvimento; somente marcar como validadas após CI verde e testes operacionais em staging com cursos reais e exportação final. Nenhum deploy de produção foi feito.
+
+## Novidade — dias de encontros configuráveis por turma (todos os modelos)
+- Causa: o preset de Qualificação usa sábado como dia permitido para presencial, tornando inválidos encontros agendados em dias úteis quando a turma segue outra organização.
+- Solução: na aba Dados da turma, painel **Dias permitidos nesta turma**, configurar separadamente presencial, síncrono e estudo EaD usando seletores de domingo a sábado. A personalização é salva em `personalizarCronograma` e `configuracaoCronograma`, campos já aceitos pelo backend; os defaults do curso são mantidos quando a turma não personaliza.
+- O botão **Restaurar dias do curso** remove apenas as escolhas semanais da turma, sem apagar outras regras customizadas; não se permite lista vazia.
+- Ao alterar os dias, datas de encontros já digitadas podem exigir recálculo ou correção manual; as alterações nos dias não são autorização para sobrescrever datas automaticamente.
+- Teste `tests/schedule-profiles.mjs` amplia a validação para os cinco modelos e garante que o curso original não é alterado.
+- Homologação visual e regressão completa ainda dependem do CI da alteração e de testes em WordPress/staging.
