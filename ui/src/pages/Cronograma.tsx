@@ -13,7 +13,7 @@ import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
 import { compute, simularRecalculoPeriodo, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, fimFaseIntensivaAprendizagem, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
 import { quando } from '@/lib/format'
-import { aplicarConfiguracaoTurma, MODELO_LABEL } from '@/lib/scheduleProfiles'
+import { aplicarConfiguracaoTurma, resolverPerfilCronograma, MODELO_LABEL } from '@/lib/scheduleProfiles'
 import type { ExportEntrada } from '@/lib/export'
 import type { Encontro, ItemTurma } from '@/lib/types'
 import { Timeline } from './Timeline'
@@ -191,6 +191,28 @@ function CronogramaAberto() {
   const inicio = G.rows[0]?.c.J || t.inicio
   const semUCs = G.rows.length === 0
   const fimTxt = t.fimManual ? fmt(t.fimManual) : G.end ? fmt(G.end) : ''
+  const perfilDias = resolverPerfilCronograma(curso)
+  const diasNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+  const alterarDias = (tipo: 'presencial' | 'sincrono' | 'estudo', dia: number) => update(x => {
+    const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
+    const cfg = tt.configuracaoCronograma || {}
+    const atual = tipo === 'estudo'
+      ? perfilDias.diasEstudoPermitidos
+      : perfilDias[tipo].diasPermitidos
+    const novo = atual.includes(dia) ? atual.filter(d => d !== dia) : [...atual, dia].sort((a, b) => a - b)
+    if (!novo.length) return
+    tt.personalizarCronograma = true
+    if (tipo === 'estudo') tt.configuracaoCronograma = { ...cfg, diasEstudoPermitidos: novo }
+    else tt.configuracaoCronograma = { ...cfg, [tipo]: { ...(cfg[tipo] || {}), diasPermitidos: novo } }
+  })
+  const restaurarDias = () => update(x => {
+    const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
+    const cfg = { ...(tt.configuracaoCronograma || {}) }
+    delete cfg.diasEstudoPermitidos
+    if (cfg.presencial) { cfg.presencial = { ...cfg.presencial }; delete cfg.presencial.diasPermitidos }
+    if (cfg.sincrono) { cfg.sincrono = { ...cfg.sincrono }; delete cfg.sincrono.diasPermitidos }
+    tt.configuracaoCronograma = cfg
+  })
   const setFim = (v: string) => update(x => { const a = x.turmas.find(a => a.id === t.id)!; if (v && v !== G.end) a.fimManual = v; else delete a.fimManual })
   const recalcularPeriodo = () => {
     if (!podeCalcular || !t.inicio || !t.fimManual) return
@@ -278,6 +300,27 @@ function CronogramaAberto() {
               <input type="date" className="field-input" disabled={!podeCalcular} value={t.itens[it.id]?.inicioPlanejado || ''} onChange={e => setItem(it.id, { inicioPlanejado: e.target.value })} />
             </Field>
           ))}
+          <div className="sm:col-span-3 rounded-lg border bg-secondary/30 p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div><h3 className="font-semibold">Dias permitidos nesta turma</h3><p className="text-xs text-muted-foreground">Personalize os dias de encontros, momentos síncronos e estudo para qualquer modelo, sem alterar o curso original.</p></div>
+              {podeCalcular && <button type="button" className="rounded-md border bg-card px-3 py-2 text-xs" onClick={restaurarDias}>Restaurar dias do curso</button>}
+            </div>
+            {([
+              ['presencial', 'Encontros presenciais', perfilDias.presencial.diasPermitidos],
+              ['sincrono', 'Momentos síncronos', perfilDias.sincrono.diasPermitidos],
+              ['estudo', 'Estudo / cronograma EaD', perfilDias.diasEstudoPermitidos],
+            ] as const).map(([tipo, rotulo, dias]) => (
+              <fieldset key={tipo} className="mb-3 last:mb-0">
+                <legend className="mb-1 text-sm font-semibold">{rotulo}</legend>
+                <div className="flex flex-wrap gap-2">
+                  {diasNomes.map((nome, dia) => <label key={dia} className="inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-md border bg-card px-2.5 text-sm">
+                    <input type="checkbox" disabled={!podeCalcular || (dias.length === 1 && dias.includes(dia))} checked={dias.includes(dia)} onChange={() => alterarDias(tipo, dia)} />
+                    {nome}
+                  </label>)}
+                </div>
+              </fieldset>
+            ))}
+          </div>
           <Field label="Nome da turma"><input className="field-input" disabled={!podeCalcular} value={t.nome} onChange={e => update(x => { x.turmas.find(a => a.id === t.id)!.nome = e.target.value })} /></Field>
           {comPres && <Field label="Ambiente"><input className="field-input" disabled={lAj} value={t.ambiente} onChange={e => update(x => { x.turmas.find(a => a.id === t.id)!.ambiente = e.target.value })} /></Field>}
         </div>
