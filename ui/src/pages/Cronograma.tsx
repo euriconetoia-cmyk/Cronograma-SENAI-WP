@@ -90,7 +90,7 @@ function CronogramaAberto() {
   }, [podeCalcular, t?.id, t?.inicio, G, d.feriados]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ao mudar o início, as datas dos encontros são recalculadas junto (as digitadas antes deixam de valer).
-  const mudarInicio = (v: string) => update(x => { const tt = x.turmas.find(a => a.id === t!.id); if (!tt) return; tt.inicio = v; for (const k of Object.keys(tt.itens)) { if (tt.itens[k]?.enc) delete tt.itens[k].enc; if (tt.itens[k]?.sin) delete tt.itens[k].sin } })
+  const mudarInicio = (v: string) => update(x => { const tt = x.turmas.find(a => a.id === t!.id); if (!tt) return; tt.inicio = v; for (const k of Object.keys(tt.itens)) { if (tt.itens[k]?.enc) delete tt.itens[k].enc; if (tt.itens[k]?.sin) delete tt.itens[k].sin; if (!curso.modulos.some(m => m.itens.some(it => it.id === k && it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) delete tt.itens[k].inicioPlanejado } })
 
   if (!t) return <Empty titulo={T.cron.semTurma.titulo} texto={T.cron.semTurma.texto} acao={T.cron.semTurma.acao} onAcao={() => go('turmas')} />
   // Solicitação de um curso ainda não cadastrado: só há o pedido; a Unidigit@l cadastra o curso antes de iniciar.
