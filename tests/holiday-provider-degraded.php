@@ -50,7 +50,29 @@ try {
 	if ( $requests !== 2 || $again !== $result ) {
 		WP_CLI::error( 'Segunda consulta deve aproveitar cache degradado até expirar.' );
 	}
-	WP_CLI::success( 'Feriados: JSON inválido estadual/municipal, aviso, TTL curto e cache reutilizado.' );
+	// Indisponibilidade real simulada: o transporte retorna WP_Error.
+	delete_transient( $local_key );
+	$unavailable_calls = 0;
+	$unavailable = static function ( $pre, $args, $url ) use ( &$unavailable_calls ) {
+		++$unavailable_calls;
+		return new WP_Error( 'http_request_failed', 'Timeout sintético da integração.' );
+	};
+	remove_filter( 'pre_http_request', $interceptor, 10 );
+	add_filter( 'pre_http_request', $unavailable, 10, 3 );
+	try {
+		$result_offline = Cronograma_EAD_Service::feriados_local( $unit, $year );
+		if ( is_wp_error( $result_offline ) || 2 !== count( $result_offline['avisos'] ) || ! empty( $result_offline['feriados'] ) || 2 !== $unavailable_calls ) {
+			WP_CLI::error( 'Falhas HTTP simultâneas devem gerar dois avisos e resultado vazio.' );
+		}
+		$timeout_offline = (int) get_option( '_transient_timeout_' . $local_key, 0 );
+		if ( $timeout_offline < time() || $timeout_offline > time() + 15 * 60 + 15 ) {
+			WP_CLI::error( 'Falha de transporte deve manter TTL curto.' );
+		}
+	} finally {
+		remove_filter( 'pre_http_request', $unavailable, 10 );
+		add_filter( 'pre_http_request', $interceptor, 10, 3 );
+	}
+	WP_CLI::success( 'Feriados: JSON inválido, falha HTTP, avisos, TTL curto e cache reutilizado.' );
 } finally {
 	remove_filter( 'pre_http_request', $interceptor, 10 );
 	remove_filter( 'pre_option_' . Cronograma_EAD_Store::OPT_DATA, $filter_catalog );
