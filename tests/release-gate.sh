@@ -25,6 +25,8 @@ command -v pnpm >/dev/null || { echo 'BLOQUEIO: pnpm não instalado.' >&2; exit 
 )
 cp ui/dist-wp/app.js plugin-cronograma-ead-core/assets/app.js
 test -s plugin-cronograma-ead-core/assets/app.js || { echo 'BLOQUEIO: bundle WordPress não foi gerado.' >&2; exit 21; }
+# Baseline reproduzível dos artefatos sem inferir métricas de navegação.
+bash tests/performance-artifact-baseline.sh
 
 command -v docker >/dev/null || { echo 'BLOQUEIO: Docker não instalado.' >&2; exit 22; }
 docker compose up -d db wordpress
