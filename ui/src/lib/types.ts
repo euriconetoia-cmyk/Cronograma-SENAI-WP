@@ -13,14 +13,15 @@ export interface ConfiguracaoItemCronograma extends ConfiguracaoCronograma {}
 export interface Item { id: string; tipo: Tipo; nome: string; ch: number; pres: number; div: number; sincronos?: number; duracaoSincrono?: number; configuracaoCronograma?: ConfiguracaoItemCronograma }
 export interface Modulo { id: string; nome: string; itens: Item[] }
 export interface Regras { hEncontro: number; webDias: number; webHora: string; postDias: number; horario: string }
-export type Modalidade = 'ead' | 'semipresencial' | 'presencial'
+export type Modalidade = 'ead' | 'semipresencial'
 export type Categoria = 'iniciacao' | 'aprendizagem_basica' | 'qualificacao' | 'aperfeicoamento' | 'especializacao_prof' | 'aprendizagem_tecnica' | 'tecnico' | 'curso_livre' | 'graduacao_tecnologica' | 'graduacao' | 'pos_graduacao' | 'mestrado_doutorado'
 export interface Curso { id: string; nome: string; categoria?: Categoria | ''; modalidade?: Modalidade | ''; modeloCronograma?: ModeloCronograma; configuracaoCronograma?: ConfiguracaoCronograma; chTotal: number; nota: string; regras: Regras; modulos: Modulo[]; resumo?: boolean }
 export interface Pessoa { id: string; nome: string; papel: Papel }
-export interface Unidade { id: string; nome: string; cidade?: string }
+export interface Unidade { id: string; nome: string; cidade?: string; estado: string; codigoIbge?: string }
 export interface Encontro { d: string; h: string; w: string }
 export interface EventoPedagogico { id?: string; tipo: TipoEventoPedagogico; d: string; fim?: string; h?: string; duracaoHoras?: number; titulo?: string; observacao?: string }
 export interface ItemTurma {
+  inicioPlanejado?: string; // marco de início confirmado no recálculo do período
   enc?: Encontro[]; sin?: Encontro[]; eventos?: EventoPedagogico[]; rec?: string; evento?: string
   monitorId?: string; tutorId?: string; coordId?: string; profId?: string; ambiente?: string
   scorm?: string; apostila?: string; aval?: string; pesq?: string; media?: string; idm?: string
@@ -28,12 +29,14 @@ export interface ItemTurma {
 export interface Vigente { versao: number; por: string; em: string; ressalva: string }
 export interface Turma {
   id: string; cursoId: string; nome: string; unidadeId: string; inicio: string; fimManual?: string; cursoSolicitado?: string; evento: string
+  personalizarCronograma?: boolean; configuracaoCronograma?: ConfiguracaoCronograma
   monitorId: string; tutorId: string; coordId: string; profId: string; ambiente: string; obs?: string
   itens: Record<string, ItemTurma>
   status: Status; versao: number; rev: number; prazo: string; vigente: Vigente | null
 }
-/** [data, motivo, unidadeId?] — sem unidade vale para todas. */
-export type Feriado = [string, string, string?]
+/** [data, motivo, unidadeId?, tipo?, origem?] — sem unidade vale para todas. */
+export type TipoFeriado = 'nacional' | 'estadual' | 'municipal' | 'institucional' | 'ponto_facultativo'
+export type Feriado = [string, string, string?, TipoFeriado?, string?]
 export interface Catalogo { cursos: Curso[]; pessoas: Pessoa[]; feriados: Feriado[]; unidades: Unidade[] }
 export interface Dados extends Catalogo { turmas: Turma[] }
 export interface Me { id: number; nome: string; perfil: Perfil; unidades: string[]; validador: boolean; prazoDias: number; podeEquipe?: boolean }

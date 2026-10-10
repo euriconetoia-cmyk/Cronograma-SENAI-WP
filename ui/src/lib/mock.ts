@@ -82,6 +82,50 @@ export const mockApi: Api = {
     const { rotulo: _r, ...m } = me(); void _r
     return { me: m, catalogo: cat, crev: S.crev, turmas } satisfies Boot
   },
+  async feriadosNacionais(ano) {
+    const fixos: [string, string][] = [
+      [`${ano}-01-01`, 'Confraternização Universal'],
+      [`${ano}-04-21`, 'Tiradentes'],
+      [`${ano}-05-01`, 'Dia Mundial do Trabalho'],
+      [`${ano}-09-07`, 'Independência do Brasil'],
+      [`${ano}-10-12`, 'Nossa Senhora Aparecida'],
+      [`${ano}-11-02`, 'Finados'],
+      [`${ano}-11-15`, 'Proclamação da República'],
+      [`${ano}-11-20`, 'Dia Nacional de Zumbi e da Consciência Negra'],
+      [`${ano}-12-25`, 'Natal'],
+    ]
+    return { ano, feriados: fixos, cache: true }
+  },
+  async municipios(uf) {
+    const estado = uf.toUpperCase()
+    const municipios = S.unidades
+      .filter(u => u.estado === estado && !!u.codigoIbge && !!u.cidade)
+      .map(u => ({ nome: u.cidade!, codigoIbge: u.codigoIbge! }))
+      .filter((u, i, lista) => lista.findIndex(x => x.codigoIbge === u.codigoIbge) === i)
+    return { uf: estado, municipios, cache: true }
+  },
+  async feriadosLocal(unidadeId, ano) {
+    const unidade = S.unidades.find(u => u.id === unidadeId)
+    if (!unidade || (me().perfil !== 'equipe' && !me().unidades.includes(unidadeId))) throw new ApiError(404, 'nao_achou', 'Unidade não encontrada.')
+    const feriados = S.feriados
+      .filter(f => f[0].startsWith(`${ano}-`) && f[2] === unidadeId && (f[3] === 'estadual' || f[3] === 'municipal'))
+      .map(f => [f[0], f[1], f[3] as 'estadual' | 'municipal', f[4] || 'Cadastro local'] as [string, string, 'estadual' | 'municipal', string])
+    return {
+      unidadeId, ano,
+      localidade: { cidade: unidade.cidade || '', uf: unidade.estado, codigoIbge: unidade.codigoIbge || '' },
+      feriados, municipalConfigurado: false,
+      avisos: ['Prévia: apenas feriados regionais cadastrados; não consulta serviço externo.'],
+    }
+  },
+  async feriadosConfig() {
+    if (me().perfil !== 'equipe') throw new ApiError(403, 'sem_permissao', 'Sem permissão para configurações.')
+    return { municipalConfigurado: false }
+  },
+  async salvarFeriadosConfig(_apiKey) {
+    if (me().perfil !== 'equipe') throw new ApiError(403, 'sem_permissao', 'Sem permissão para configurações.')
+    void _apiKey
+    throw new ApiError(501, 'indisponivel', 'A prévia não configura integrações externas.')
+  },
   async saveCatalogo(data, rev) {
     if (me().perfil !== 'equipe') throw new ApiError(403, 'sem_permissao', 'Seu perfil não pode alterar o cadastro.')
     if (rev !== S.crev) throw new ApiError(409, 'conflito', 'Os dados foram alterados por outra pessoa.')

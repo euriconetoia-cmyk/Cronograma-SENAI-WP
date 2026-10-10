@@ -41,4 +41,15 @@ const aprendizagem = mk('aprendizagem', [
   assert.ok(g.rows[1].c.J>g.rows[0].c.K,'prática sequencial deve iniciar após a teoria')
 }
 
-console.log('modelos cronograma: Técnico, Qualificação, Distribuição Diária e Aprendizagem aprovados')
+const personalizado = mk('personalizado', [{id:'p1',tipo:'uc',nome:'UC personalizada',ch:24,pres:4,div:3}], {
+  diasEstudoPermitidos:[1,3,5],
+  presencial:{ativo:true,modo:'quantidade',quantidade:1,diasPermitidos:[2],duracaoHoras:4},
+})
+{
+  const g=compute(turma,personalizado,feriados)
+  assert.equal(g.rows.length,1,'personalizado deve gerar uma UC')
+  assert.equal(g.rows[0].c.nenc,1,'personalizado deve manter encontro presencial configurado')
+  assert.equal(g.rows[0].c.I,7,'personalizado deve distribuir 20h EaD em 3h por dia')
+}
+
+console.log('modelos cronograma: Técnico, Qualificação, Distribuição Diária, Aprendizagem e Personalizado aprovados')

@@ -55,21 +55,66 @@ class Cronograma_EAD_Store {
 		if ( false === $json || strlen( $json ) > self::MAX_BYTES ) {
 			return new WP_Error( 'cronograma_ead_grande', 'Os dados são grandes demais para salvar.', array( 'status' => 413 ) );
 		}
-		if ( get_transient( 'cronograma_ead_lock' ) ) {
+		// add_option e atomico: o indice UNIQUE option_name garante um unico escritor.
+		// O antigo get_transient/set_transient permitia que duas requisicoes
+		// adquirissem o mesmo lock simultaneamente.
+		$lock = 'cronograma_ead_catalog_write_lock';
+		// Um mutex abandonado exige intervenção explícita: não apagar automaticamente,
+		// pois um escritor legítimo pode continuar ativo mesmo após expirar um TTL.
+		if ( ! add_option( $lock, time(), '', false ) ) {
 			return new WP_Error( 'cronograma_ead_ocupado', 'Outra gravação está em andamento. Tente de novo.', array( 'status' => 503 ) );
 		}
-		set_transient( 'cronograma_ead_lock', 1, 10 );
-
-		$current = (int) get_option( self::OPT_REV, 0 );
-		if ( (int) $rev !== $current ) {
-			delete_transient( 'cronograma_ead_lock' );
-			return new WP_Error( 'cronograma_ead_conflito', 'Os dados foram alterados por outra pessoa.', array( 'status' => 409, 'rev' => $current ) );
+		try {
+			// Nao confiar no cache de options ao arbitrar revisoes entre requisicoes.
+			wp_cache_delete( self::OPT_REV, 'options' );
+			wp_cache_delete( 'alloptions', 'options' );
+			$current = (int) get_option( self::OPT_REV, 0 );
+			if ( (int) $rev !== $current ) {
+				return new WP_Error( 'cronograma_ead_conflito', 'Os dados foram alterados por outra pessoa.', array( 'status' => 409, 'rev' => $current ) );
+			}
+			$previous = get_option( self::OPT_DATA, '' );
+			if ( ! update_option( self::OPT_DATA, $json, false ) && $previous !== $json ) {
+				return new WP_Error( 'cronograma_ead_gravacao', 'Não foi possível gravar os dados do catálogo.', array( 'status' => 500 ) );
+			}
+			$new = $current + 1;
+			if ( ! update_option( self::OPT_REV, $new, false ) ) {
+				// Não deixar os dados novos com a revisão antiga, caso o segundo write falhe.
+				$compensated = update_option( self::OPT_DATA, $previous, false );
+				wp_cache_delete( self::OPT_DATA, 'options' );
+				wp_cache_delete( 'alloptions', 'options' );
+				if ( ! $compensated && get_option( self::OPT_DATA, '' ) !== $previous ) {
+					return new WP_Error( 'cronograma_ead_inconsistencia', 'Falha crítica ao recuperar o catálogo. Bloqueie novas operações e recupere o backup.', array( 'status' => 500 ) );
+				}
+				return new WP_Error( 'cronograma_ead_gravacao', 'Não foi possível atualizar a revisão do catálogo.', array( 'status' => 500 ) );
+			}
+			return array( 'rev' => $new );
+		} finally {
+			delete_option( $lock );
 		}
+	}
+
+	/** Restaura exatamente um snapshot interno do catálogo após falha transacional. */
+	public static function restore_snapshot( $snapshot ) {
+		if ( ! is_array( $snapshot ) || ! isset( $snapshot['data'], $snapshot['rev'] ) || ! is_array( $snapshot['data'] ) ) {
+			return false;
+		}
+		$json = wp_json_encode( $snapshot['data'] );
+		if ( false === $json || strlen( $json ) > self::MAX_BYTES ) {
+			return false;
+		}
+		// O rollback SQL não desfaz automaticamente o cache de options do WordPress.
+		// Releia os valores persistidos antes de tentar restaurar o snapshot.
+		wp_cache_delete( self::OPT_DATA, 'options' );
+		wp_cache_delete( self::OPT_REV, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
 		update_option( self::OPT_DATA, $json, false );
-		$new = $current + 1;
-		update_option( self::OPT_REV, $new, false );
+		update_option( self::OPT_REV, (int) $snapshot['rev'], false );
+		wp_cache_delete( self::OPT_DATA, 'options' );
+		wp_cache_delete( self::OPT_REV, 'options' );
+		wp_cache_delete( 'alloptions', 'options' );
 		delete_transient( 'cronograma_ead_lock' );
-		return array( 'rev' => $new );
+		$restored = self::get();
+		return $restored['rev'] === (int) $snapshot['rev'] && $restored['data'] === $snapshot['data'];
 	}
 
 	/** Valida a estrutura do catálogo e limpa todos os textos. */
@@ -94,6 +139,35 @@ class Cronograma_EAD_Store {
 			}
 			$out[ $k ] = array_values( self::clean( $input[ $k ] ) );
 		}
+		foreach ( $out['cursos'] as $i => $curso ) {
+			if ( isset( $curso['modalidade'] ) && 'presencial' === $curso['modalidade'] ) {
+				$out['cursos'][ $i ]['modalidade'] = 'semipresencial';
+			}
+			if ( isset( $out['cursos'][ $i ]['modalidade'] ) && '' !== $out['cursos'][ $i ]['modalidade'] && ! in_array( $out['cursos'][ $i ]['modalidade'], array( 'ead', 'semipresencial' ), true ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Modalidade inválida. Use EaD ou Semipresencial / Híbrido.', array( 'status' => 400 ) );
+			}
+		}
+		$ufs = array( 'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO' );
+		foreach ( $out['unidades'] as $i => $unidade ) {
+			$estado = isset( $unidade['estado'] ) ? strtoupper( trim( (string) $unidade['estado'] ) ) : '';
+			$cidade = isset( $unidade['cidade'] ) ? trim( (string) $unidade['cidade'] ) : '';
+			if ( ! in_array( $estado, $ufs, true ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Estado inválido no cadastro da unidade.', array( 'status' => 400 ) );
+			}
+			if ( '' === $cidade ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Informe a cidade da unidade.', array( 'status' => 400 ) );
+			}
+			$out['unidades'][ $i ]['estado'] = $estado;
+			$out['unidades'][ $i ]['cidade'] = $cidade;
+			if ( isset( $unidade['codigoIbge'] ) && '' !== (string) $unidade['codigoIbge'] ) {
+				$ibge = preg_replace( '/\D+/', '', (string) $unidade['codigoIbge'] );
+				if ( ! preg_match( '/^\d{7}$/', $ibge ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Código IBGE inválido no cadastro da unidade.', array( 'status' => 400 ) );
+				}
+				$out['unidades'][ $i ]['codigoIbge'] = $ibge;
+			}
+		}
+
 		foreach ( $out['cursos'] as $c ) {
 			if ( ! is_array( $c ) || empty( $c['id'] ) || ! self::valid_id( $c['id'] ) || ! isset( $c['modulos'] ) || ! is_array( $c['modulos'] ) ) {
 				return new WP_Error( 'cronograma_ead_invalido', 'Curso com estrutura inválida.', array( 'status' => 400 ) );
@@ -165,7 +239,7 @@ class Cronograma_EAD_Store {
 		if ( false === $raw || strlen( $raw ) > 262144 ) {
 			return new WP_Error( 'cronograma_ead_grande', 'Os dados da turma excedem o limite de 256 KB.', array( 'status' => 413 ) );
 		}
-		$allowed = array( 'id', 'cursoId', 'nome', 'unidadeId', 'inicio', 'fimManual', 'cursoSolicitado', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'obs', 'itens', 'status', 'versao', 'rev', 'prazo', 'vigente' );
+		$allowed = array( 'id', 'cursoId', 'nome', 'unidadeId', 'inicio', 'fimManual', 'cursoSolicitado', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'obs', 'itens', 'status', 'versao', 'rev', 'prazo', 'vigente', 'personalizarCronograma', 'configuracaoCronograma' );
 		foreach ( array_keys( $input ) as $k ) {
 			if ( ! in_array( (string) $k, $allowed, true ) ) {
 				return new WP_Error( 'cronograma_ead_campo', 'Campo de turma não permitido: ' . sanitize_text_field( (string) $k ) . '.', array( 'status' => 400 ) );
@@ -199,13 +273,72 @@ class Cronograma_EAD_Store {
 				return new WP_Error( 'cronograma_ead_invalido', "Data inválida em $k (use AAAA-MM-DD).", array( 'status' => 400 ) );
 			}
 		}
+		if ( isset( $input['status'] ) && in_array( (string) $input['status'], array( 'solicitado', 'elaboracao', 'validacao', 'validado', 'arquivado' ), true ) ) {
+			$t['status'] = (string) $input['status'];
+		}
+		if ( isset( $input['versao'] ) ) {
+			$t['versao'] = max( 1, (int) $input['versao'] );
+		}
+		if ( isset( $input['rev'] ) ) {
+			$t['rev'] = max( 1, (int) $input['rev'] );
+		}
+		if ( isset( $input['prazo'] ) && '' !== (string) $input['prazo'] ) {
+			$prazo = sanitize_text_field( (string) $input['prazo'] );
+			if ( ! Cronograma_EAD_Rules::data_ok( $prazo ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Prazo inválido na turma.', array( 'status' => 400 ) );
+			}
+			$t['prazo'] = $prazo;
+		} elseif ( array_key_exists( 'prazo', $input ) ) {
+			$t['prazo'] = '';
+		}
+		if ( isset( $input['vigente'] ) && is_array( $input['vigente'] ) ) {
+			$t['vigente'] = self::clean( $input['vigente'] );
+		} elseif ( array_key_exists( 'vigente', $input ) ) {
+			$t['vigente'] = null;
+		}
+		$t['personalizarCronograma'] = ! empty( $input['personalizarCronograma'] );
+		if ( isset( $input['configuracaoCronograma'] ) ) {
+			if ( ! is_array( $input['configuracaoCronograma'] ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Configuração de cronograma da turma inválida.', array( 'status' => 400 ) );
+			}
+			$cfg = self::clean( $input['configuracaoCronograma'] );
+			$cfg_allowed = array( 'cargaDiaria', 'diasEstudoPermitidos', 'presencial', 'sincrono', 'praticaProfissional', 'aprendizagem' );
+			foreach ( array_keys( $cfg ) as $cfg_key ) {
+				if ( ! in_array( (string) $cfg_key, $cfg_allowed, true ) ) {
+					return new WP_Error( 'cronograma_ead_campo', 'Configuração de turma não permitida: ' . sanitize_text_field( (string) $cfg_key ) . '.', array( 'status' => 400 ) );
+				}
+			}
+			if ( isset( $cfg['diasEstudoPermitidos'] ) && ! self::dias_semana_validos( $cfg['diasEstudoPermitidos'] ) ) {
+				return new WP_Error( 'cronograma_ead_invalido', 'Dias de estudo inválidos na turma.', array( 'status' => 400 ) );
+			}
+			foreach ( array( 'presencial', 'sincrono' ) as $tipo_evento ) {
+				if ( isset( $cfg[ $tipo_evento ] ) && ! is_array( $cfg[ $tipo_evento ] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Regra de evento inválida na turma.', array( 'status' => 400 ) );
+				}
+				if ( isset( $cfg[ $tipo_evento ]['diasPermitidos'] ) && ! self::dias_semana_validos( $cfg[ $tipo_evento ]['diasPermitidos'] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Dias permitidos inválidos na turma.', array( 'status' => 400 ) );
+				}
+			}
+			if ( isset( $cfg['aprendizagem'] ) ) {
+				if ( ! is_array( $cfg['aprendizagem'] ) ) {
+					return new WP_Error( 'cronograma_ead_invalido', 'Configuração de Aprendizagem da turma inválida.', array( 'status' => 400 ) );
+				}
+				foreach ( array( 'diasIntensivos', 'diasAtendimentoRegular' ) as $campo_dias ) {
+					if ( isset( $cfg['aprendizagem'][ $campo_dias ] ) && ! self::dias_semana_validos( $cfg['aprendizagem'][ $campo_dias ] ) ) {
+						return new WP_Error( 'cronograma_ead_invalido', 'Dias de Aprendizagem inválidos na turma.', array( 'status' => 400 ) );
+					}
+				}
+			}
+			$t['configuracaoCronograma'] = $cfg;
+		}
+
 		$t['itens'] = array();
 		$in_itens = isset( $input['itens'] ) && is_array( $input['itens'] ) ? $input['itens'] : array();
 		if ( count( $in_itens ) > 500 ) {
 			return new WP_Error( 'cronograma_ead_grande', 'Quantidade excessiva de etapas na turma.', array( 'status' => 413 ) );
 		}
-		$item_allowed = array( 'enc', 'sin', 'eventos', 'rec', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'scorm', 'apostila', 'aval', 'pesq', 'media', 'idm' );
-		$item_limits = array( 'rec' => 2000, 'evento' => 190, 'monitorId' => 64, 'tutorId' => 64, 'coordId' => 64, 'profId' => 64, 'ambiente' => 190, 'scorm' => 190, 'apostila' => 190, 'aval' => 190, 'pesq' => 190, 'media' => 190, 'idm' => 190 );
+		$item_allowed = array( 'inicioPlanejado', 'enc', 'sin', 'eventos', 'rec', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'scorm', 'apostila', 'aval', 'pesq', 'media', 'idm' );
+		$item_limits = array( 'inicioPlanejado' => 10, 'rec' => 2000, 'evento' => 190, 'monitorId' => 64, 'tutorId' => 64, 'coordId' => 64, 'profId' => 64, 'ambiente' => 190, 'scorm' => 190, 'apostila' => 190, 'aval' => 190, 'pesq' => 190, 'media' => 190, 'idm' => 190 );
 		foreach ( $in_itens as $id => $it ) {
 			$id = (string) $id;
 			if ( ! self::valid_id( $id ) || ! is_array( $it ) ) {
@@ -225,6 +358,9 @@ class Cronograma_EAD_Store {
 					}
 					$clean_item[ $k ] = $v;
 				}
+			}
+			if ( ! empty( $clean_item['inicioPlanejado'] ) && ! Cronograma_EAD_Rules::data_ok( $clean_item['inicioPlanejado'] ) ) {
+				return new WP_Error( 'cronograma_ead_data', "Data de início planejado inválida na etapa $id.", array( 'status' => 422 ) );
 			}
 			foreach ( array( 'enc' => 'Encontros', 'sin' => 'Momentos síncronos' ) as $campo_momento => $rotulo_momento ) {
 				if ( ! isset( $it[ $campo_momento ] ) ) {

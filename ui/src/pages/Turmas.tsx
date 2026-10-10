@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/Status'
 import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
 import { compute, cursoTemPres, fmt } from '@/lib/schedule'
+import { aplicarConfiguracaoTurma, MODELO_LABEL } from '@/lib/scheduleProfiles'
 import type { Status, Turma } from '@/lib/types'
 
 export function TurmasPage() {
@@ -29,7 +30,8 @@ export function TurmasPage() {
     return d.turmas.filter(x => (filtro ? x.status === filtro : verArq || x.status !== 'arquivado') && (!q || `${x.nome} ${d.cursos.find(c => c.id === x.cursoId)?.nome || x.cursoSolicitado || ''} ${d.unidades.find(u => u.id === x.unidadeId)?.nome || ''}`.toLowerCase().includes(q)))
   }, [d.turmas, d.cursos, d.unidades, verArq, filtro, busca])
   const t = d.turmas.find(x => x.id === turmaId) || lista[0]
-  const curso = t ? d.cursos.find(c => c.id === t.cursoId) : undefined
+  const cursoBase = t ? d.cursos.find(c => c.id === t.cursoId) : undefined
+  const curso = cursoBase ? aplicarConfiguracaoTurma(cursoBase, t) : undefined
   const comPres = !curso || !!curso.resumo || cursoTemPres(curso)
   const G = useMemo(() => (t && curso && !curso.resumo ? compute(t, curso, d.feriados) : null), [t, curso, d.feriados])
   const equipe = me.perfil === 'equipe'
@@ -83,7 +85,7 @@ export function TurmasPage() {
           {equipe && ['solicitado', 'elaboracao', 'arquivado'].includes(t.status) && <Button size="sm" variant="outline" className="text-destructive" onClick={() => setConfirma(T.turmas.confirma(t.nome))}><Trash2 size={14} />{T.turmas.excluir}</Button>}
         </>}>
           <button type="button" onClick={() => setDetalhe(false)} className="mb-3 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-primary md:hidden"><ArrowLeft size={16} />Voltar para as turmas</button>
-          <div className="mb-3 flex flex-wrap items-center gap-2"><StatusBadge status={t.status} versao={t.versao} /><span className="text-sm text-muted-foreground">{unidadeNome(t.unidadeId)}</span></div>
+          <div className="mb-3 flex flex-wrap items-center gap-2"><StatusBadge status={t.status} versao={t.versao} /><span className="text-sm text-muted-foreground">{unidadeNome(t.unidadeId)}</span>{curso && <span className="rounded-full border border-primary/30 bg-accent px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-primary">{MODELO_LABEL[curso.modeloCronograma || 'qualificacao']}</span>}</div>
           <div className="flex flex-col gap-3">
           <Secao titulo="Identificação" resumo={`${t.nome || 'Sem nome'} · ${unidadeNome(t.unidadeId)} · ${curso?.nome || 'Sem curso'}`} aberta>
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -98,6 +100,18 @@ export function TurmasPage() {
             {comPres && <Field label="Ambiente"><input disabled={lAj} className="field-input" value={t.ambiente} onChange={e => set('ambiente', e.target.value)} /></Field>}
           </div>
           </Secao>
+          {curso && <Secao titulo="Modelo do cronograma" resumo={`${MODELO_LABEL[curso.modeloCronograma || 'qualificacao']}${t.personalizarCronograma ? ' · personalizado nesta turma' : ' · usando regras do curso'}`}>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <Field label="Configuração da turma"><label className="flex min-h-[42px] items-center gap-2 rounded-md border px-3 text-sm"><input type="checkbox" disabled={lEq} checked={!!t.personalizarCronograma} onChange={e => set('personalizarCronograma', e.target.checked)} />Personalizar esta turma</label></Field>
+            {!t.personalizarCronograma && <div className="self-end rounded-md bg-secondary px-3 py-2 text-sm text-muted-foreground">As regras são herdadas do curso. Alterações futuras no curso serão refletidas nesta turma enquanto ela não tiver personalização própria.</div>}
+            {t.personalizarCronograma && curso.modeloCronograma === 'distribuicao_diaria' && <Field label="Carga diária desta turma (h)"><input disabled={lEq} type="number" min={0.5} step={0.5} className="field-input mono" value={t.configuracaoCronograma?.cargaDiaria ?? cursoBase?.configuracaoCronograma?.cargaDiaria ?? 3} onChange={e => set('configuracaoCronograma', { ...(t.configuracaoCronograma || {}), cargaDiaria: +e.target.value })} /></Field>}
+            {t.personalizarCronograma && curso.modeloCronograma === 'aprendizagem' && <>
+              <Field label="Dias úteis da fase intensiva"><input disabled={lEq} type="number" min={0} className="field-input mono" value={t.configuracaoCronograma?.aprendizagem?.faseIntensivaDiasUteis ?? cursoBase?.configuracaoCronograma?.aprendizagem?.faseIntensivaDiasUteis ?? 23} onChange={e => set('configuracaoCronograma', { ...(t.configuracaoCronograma || {}), aprendizagem: { ...(t.configuracaoCronograma?.aprendizagem || {}), faseIntensivaDiasUteis: Math.max(0, +e.target.value) } })} /></Field>
+              <Field label="Dias semanais (1=seg ... 6=sáb)"><input disabled={lEq} className="field-input mono" value={(t.configuracaoCronograma?.aprendizagem?.diasAtendimentoRegular ?? cursoBase?.configuracaoCronograma?.aprendizagem?.diasAtendimentoRegular ?? [1,2]).join(',')} onChange={e => set('configuracaoCronograma', { ...(t.configuracaoCronograma || {}), aprendizagem: { ...(t.configuracaoCronograma?.aprendizagem || {}), diasAtendimentoRegular: e.target.value.split(',').map(v => +v.trim()).filter(v => Number.isInteger(v) && v >= 0 && v <= 6) } })} /></Field>
+              <Field label="Horário das webaulas"><input disabled={lEq} className="field-input" value={t.configuracaoCronograma?.aprendizagem?.horarioWebaula ?? cursoBase?.configuracaoCronograma?.aprendizagem?.horarioWebaula ?? '13:30 às 17:00'} onChange={e => set('configuracaoCronograma', { ...(t.configuracaoCronograma || {}), aprendizagem: { ...(t.configuracaoCronograma?.aprendizagem || {}), horarioWebaula: e.target.value } })} /></Field>
+            </>}
+          </div>
+          </Secao>}
           <Secao titulo="Datas" resumo={`${fmt(t.inicio) || 'sem início'} → ${fmt(G?.end || t.fimManual) || 'sem término'}`} aberta>
           <div className="max-w-xs"><Field label="Início da turma"><input disabled={lEq} type="date" className="field-input min-h-[44px] md:min-h-0" value={t.inicio} onChange={e => set('inicio', e.target.value)} /></Field></div>
           {G && (

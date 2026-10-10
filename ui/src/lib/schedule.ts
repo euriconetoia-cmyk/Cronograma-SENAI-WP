@@ -73,7 +73,73 @@ export interface Result { curso: Curso; rows: Row[]; by: Record<string, Row>; en
 /** Feriados que valem para a turma: os gerais e os da unidade dela. */
 export const feriadosDaTurma = (t: { unidadeId: string }, feriados: Feriado[]) => feriados.filter(f => !f[2] || f[2] === t.unidadeId)
 
-export function compute(t: Pick<Turma, 'inicio' | 'unidadeId'>, curso: Curso, feriados: Feriado[]): Result {
+/**
+ * Simula uma redistribuição conservadora entre início e fim.
+ * Mantém integralmente a duração pedagógica de cada etapa; nunca comprime horas.
+ * Apenas acrescenta folgas entre etapas para atingir uma data posterior ao cálculo base.
+ * Não persiste alterações: quem chama deve confirmar e salvar a nova configuração.
+ */
+export function simularRecalculoPeriodo(
+  t: Pick<Turma, 'inicio' | 'unidadeId'>,
+  curso: Curso,
+  feriados: Feriado[],
+  fim: string
+): { ok: true; plano: Result } | { ok: false; motivo: string } {
+  if (!t.inicio || !/^\d{4}-\d{2}-\d{2}$/.test(fim) || fim < t.inicio)
+    return { ok: false, motivo: 'Informe datas válidas de início e término, em ordem cronológica.' }
+  const base = compute(t, curso, feriados)
+  if (!base.end || !base.rows.length) return { ok: false, motivo: 'O curso não possui etapas calculáveis.' }
+  if (fim < base.end) return { ok: false, motivo: `O intervalo é insuficiente: mantendo a carga horária e as regras atuais, o primeiro término possível é ${br(base.end)}.` }
+  if (fim === base.end) return { ok: true, plano: base }
+  const hol = new Set(feriadosDaTurma(t, feriados).map(f => f[0]))
+  const ultimo = base.rows[base.rows.length - 1]
+  const dias = resolverPerfilItem(ultimo.it, curso).diasEstudoPermitidos
+  const dateValid = (v: string) => !hol.has(v) && (dias.length ? dias : [1, 2, 3, 4, 5]).includes(dow(toN(v)))
+  if (!dateValid(fim)) return { ok: false, motivo: 'O término solicitado cai em feriado ou dia não permitido pelo modelo da última etapa.' }
+  // Reconstrói o começo da última etapa de trás para frente: deslocamentos
+  // fixos não são reversíveis quando há feriados no meio do intervalo.
+  if (base.rows.length < 2) return { ok: false, motivo: 'Não é possível alongar uma única etapa sem alterar sua duração ou as regras do curso.' }
+  const rows = base.rows.map(r => ({ ...r, c: { ...r.c } }))
+  const last = rows[rows.length - 1]
+  if (!last.c.J || !last.c.K) return { ok: false, motivo: 'A última etapa não possui datas calculadas.' }
+  const permitidos = new Set(dias.length ? dias : [1, 2, 3, 4, 5])
+  let dataInicio = toN(fim)
+  let restantes = last.c.I
+  while (restantes > 0) {
+    dataInicio--
+    const data = toS(dataInicio)
+    if (permitidos.has(dow(dataInicio)) && !hol.has(data)) restantes--
+  }
+  const inicioDeslocado = toS(dataInicio)
+  if (inicioDeslocado < last.c.J || (rows[rows.length - 2].c.K && inicioDeslocado <= rows[rows.length - 2].c.K!))
+    return { ok: false, motivo: 'O término exige sobreposição ou antecipação de etapas; mantenha as cargas e escolha outra data.' }
+  const fimDeslocado = workdayPermitidos(inicioDeslocado, last.c.I, hol, dias)
+  if (fimDeslocado !== fim) return { ok: false, motivo: 'Não foi possível preservar a duração pedagógica da etapa final nesse calendário.' }
+  last.c.J = inicioDeslocado
+  last.c.K = fimDeslocado
+  // Distribui parte da folga entre as UCs intermediárias, sempre preservando
+  // as datas manuais da Ambientação e as durações originais.
+  const folga = toN(inicioDeslocado) - toN(base.rows[base.rows.length - 1].c.J!)
+  for (let i = 1; i < rows.length - 1; i++) {
+    const row = rows[i]
+    if (!row.c.J || !row.c.K || row.it.tipo === 'intro') continue
+    const diasEtapa = resolverPerfilItem(row.it, curso).diasEstudoPermitidos
+    const aceitos = new Set(diasEtapa.length ? diasEtapa : [1, 2, 3, 4, 5])
+    let inicioNovo = toN(row.c.J) + Math.floor(folga * i / (rows.length - 1))
+    while (!aceitos.has(dow(inicioNovo)) || hol.has(toS(inicioNovo))) inicioNovo++
+    const anterior = rows[i - 1].c.K
+    if (anterior && toS(inicioNovo) <= anterior)
+      inicioNovo = toN(workdayPermitidos(anterior, 1, hol, diasEtapa))
+    const fimNovo = workdayPermitidos(toS(inicioNovo), row.c.I, hol, diasEtapa)
+    if (fimNovo >= inicioDeslocado) continue // preservar a viabilidade já comprovada
+    row.c.J = toS(inicioNovo)
+    row.c.K = fimNovo
+  }
+  const by = Object.fromEntries(rows.map(r => [r.it.id, r])) as Record<string, Row>
+  return { ok: true, plano: { ...base, rows, by, end: fim } }
+}
+
+export function compute(t: Pick<Turma, 'inicio' | 'unidadeId'> & { itens?: Turma['itens'] }, curso: Curso, feriados: Feriado[]): Result {
   const hol = new Set(feriadosDaTurma(t, feriados).map(f => f[0]))
   const rows: Row[] = []
   const by: Record<string, Row> = {}
@@ -89,6 +155,7 @@ export function compute(t: Pick<Turma, 'inicio' | 'unidadeId'>, curso: Curso, fe
       const ref = it.tipo === 'uc' ? lastMain : it.tipo === 'rec' ? lastUC : prev
       J = ref && ref.c.K ? workdayPermitidos(ref.c.K, 1, hol, diasEstudo) : null
     }
+    if (t.itens?.[it.id]?.inicioPlanejado) J = t.itens[it.id].inicioPlanejado || J
     const K = J ? workdayPermitidos(J, I, hol, diasEstudo) : null
     const nenc = it.tipo === 'uc' ? quantidadeEventosItem(it, curso, 'presencial') : it.tipo === 'intro' ? ((+it.pres || 0) > 0 ? 1 : 0) : 0
     const nsinc = it.tipo === 'uc' ? (perfil.modelo === 'aprendizagem' && J && K && t.inicio ? datasAtendimentoAprendizagem(t.inicio, J, K, curso, hol).length : quantidadeEventosItem(it, curso, 'sincrono')) : 0
@@ -194,12 +261,12 @@ export function planejarSincronicos(t: Pick<Turma, 'itens' | 'unidadeId' | 'inic
 }
 
 /** `ref` aponta o encontro com problema (para pintar a data de vermelho e corrigir); `dt` é o trecho do texto que vai em vermelho. */
-export type Aviso = { nivel: 'ok' | 'warn' | 'bad'; area: string; texto: string; ref?: { item: string; ix: number }; dt?: string; campo?: 'fim' }
+export type Aviso = { nivel: 'ok' | 'warn' | 'bad'; area: string; texto: string; ref?: { item: string; ix: number; tipo: 'presencial' | 'sincrono' }; dt?: string; campo?: 'inicio' | 'fim' }
 export function verificar(t: Turma, G: Result, todos: Feriado[]): Aviso[] {
   const out: Aviso[] = []
   const feriados = feriadosDaTurma(t, todos)
   const hol = new Set(feriados.map(f => f[0]))
-  if (!t.inicio) out.push({ nivel: 'bad', area: 'Turma', texto: 'Informe a data de início da turma na página Turmas.' })
+  if (!t.inicio) out.push({ nivel: 'bad', area: 'Turma', texto: 'Informe a data de início da turma.', campo: 'inicio' })
   if (G.sumUC === +G.curso.chTotal) out.push({ nivel: 'ok', area: 'Carga horária', texto: `${G.sumUC} h nas unidades curriculares, igual à carga horária total do curso.` })
   else out.push({ nivel: 'bad', area: 'Carga horária', texto: `As unidades curriculares somam ${G.sumUC} h, mas o curso tem ${G.curso.chTotal} h. Recuperação, Matrícula e o curso introdutório não entram na soma; prática profissional entra quando possui carga horária.` })
   const last = feriados.reduce((m, h) => (h[0] > m ? h[0] : m), '0000')
@@ -210,7 +277,7 @@ export function verificar(t: Turma, G: Result, todos: Feriado[]): Aviso[] {
     const diasPresenciais = diasPermitidosEvento(r.it, G.curso, 'presencial')
     encontros(t, r, G.curso).forEach((e, ix) => {
       const n = `${ix + 1}º encontro presencial de ${r.it.nome}`
-      const ref = { item: r.it.id, ix }
+      const ref = { item: r.it.id, ix, tipo: 'presencial' as const }
       if (!e.d) { out.push({ nivel: 'warn', area: 'Encontros', texto: `${n} está sem data.`, ref, dt: 'sem data' }); return }
       const dn = toN(e.d), w = dow(dn), dt = fmtShort(e.d)
       if (!diasPresenciais.includes(w)) out.push({ nivel: 'warn', area: 'Encontros', texto: `${n} cai em ${wdName(e.d)} (${dt}), fora dos dias permitidos (${diasPresenciais.map(d => WD[d]).join(', ')}).`, ref, dt })
@@ -223,14 +290,15 @@ export function verificar(t: Turma, G: Result, todos: Feriado[]): Aviso[] {
     const diasSincronos = diasPermitidosEvento(r.it, G.curso, 'sincrono')
     sincronicos(t, r, G.curso).forEach((e, ix) => {
       const n = `${ix + 1}º momento síncrono de ${r.it.nome}`
-      if (!e.d) { out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} está sem data.`, dt: 'sem data' }); return }
+      const ref = { item: r.it.id, ix, tipo: 'sincrono' as const }
+      if (!e.d) { out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} está sem data.`, ref, dt: 'sem data' }); return }
       const w = dow(toN(e.d)), dt = fmtShort(e.d)
       if (G.curso.modeloCronograma === 'aprendizagem') {
-        if (!dataAtendimentoAprendizagemValida(t.inicio, e.d, G.curso, hol)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai fora da regra de atendimento da Aprendizagem (${dt}).`, dt })
-      } else if (!diasSincronos.includes(w)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai em ${wdName(e.d)} (${dt}), fora dos dias permitidos (${diasSincronos.map(d => WD[d]).join(', ')}).`, dt })
-      if (hol.has(e.d)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai em um dia cadastrado como feriado ou férias (${dt}).`, dt })
-      if (r.c.J && r.c.K && (e.d < r.c.J || e.d > r.c.K)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} (${dt}) fica fora do período da UC, de ${fmtShort(r.c.J)} a ${fmtShort(r.c.K)}.`, dt })
-      if (prev && e.d <= prev) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} (${dt}) precisa ser depois do momento anterior.`, dt })
+        if (!dataAtendimentoAprendizagemValida(t.inicio, e.d, G.curso, hol)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai fora da regra de atendimento da Aprendizagem (${dt}).`, ref, dt })
+      } else if (!diasSincronos.includes(w)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai em ${wdName(e.d)} (${dt}), fora dos dias permitidos (${diasSincronos.map(d => WD[d]).join(', ')}).`, ref, dt })
+      if (hol.has(e.d)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} cai em um dia cadastrado como feriado ou férias (${dt}).`, ref, dt })
+      if (r.c.J && r.c.K && (e.d < r.c.J || e.d > r.c.K)) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} (${dt}) fica fora do período da UC, de ${fmtShort(r.c.J)} a ${fmtShort(r.c.K)}.`, ref, dt })
+      if (prev && e.d <= prev) out.push({ nivel: 'warn', area: 'Momentos síncronos', texto: `${n} (${dt}) precisa ser depois do momento anterior.`, ref, dt })
       prev = e.d
     })
   })
@@ -245,8 +313,8 @@ export function situacao(r: Row, hoje: string): Situacao {
   return 'aIniciar'
 }
 
-/** Chaves "item:índice" dos encontros com data a corrigir. */
-export const encontrosRuins = (avisos: Aviso[]) => new Set(avisos.filter(a => a.ref).map(a => `${a.ref!.item}:${a.ref!.ix}`))
+/** Chaves "tipo:item:índice" dos momentos com data a corrigir. */
+export const encontrosRuins = (avisos: Aviso[]) => new Set(avisos.filter(a => a.ref).map(a => `${a.ref!.tipo}:${a.ref!.item}:${a.ref!.ix}`))
 
 /**
  * Corrige só os encontros com problema: troca a data pelo dia permitido livre mais próximo, dentro do período da etapa,
@@ -259,7 +327,7 @@ export function corrigirEncontros(t: Pick<Turma, 'itens' | 'unidadeId'>, G: Resu
   for (const r of G.rows) {
     if (r.it.tipo !== 'uc' || !r.c.J) continue
     const atual = encontros(t, r, G.curso)
-    if (!atual.some((_, i) => ruins.has(`${r.it.id}:${i}`) && (!so || so === `${r.it.id}:${i}`))) continue
+    if (!atual.some((_, i) => ruins.has(`presencial:${r.it.id}:${i}`) && (!so || so === `presencial:${r.it.id}:${i}`))) continue
     const diasPermitidos = diasPermitidosEvento(r.it, G.curso, 'presencial')
     const permitidos = new Set(diasPermitidos.length ? diasPermitidos : [1, 2, 3, 4, 5])
     const sug = sugerirEventos(r.c.J, r.c.K, r.c.nenc, hol, diasPermitidos, 'distribuido')
@@ -268,7 +336,7 @@ export function corrigirEncontros(t: Pick<Turma, 'itens' | 'unidadeId'>, G: Resu
     const novo = atual.map(e => ({ ...e }))
     let prev = ''
     novo.forEach((e, i) => {
-      const k = `${r.it.id}:${i}`
+      const k = `presencial:${r.it.id}:${i}`
       if (ruins.has(k) && (!so || so === k)) {
         const usadas = new Set(novo.filter((_, j) => j !== i).map(x => x.d))
         const livres = candidatos.filter(d => toS(d) > prev && !usadas.has(toS(d)))

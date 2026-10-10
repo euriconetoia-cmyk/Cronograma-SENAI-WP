@@ -232,6 +232,46 @@ class Cronograma_EAD_DB {
 		}
 	}
 
+	public static function limpar_para_restauracao() {
+		global $wpdb;
+		foreach ( array( 'avisos', 'log', 'versoes', 'turmas' ) as $tabela ) {
+			if ( false === $wpdb->query( 'DELETE FROM ' . self::t( $tabela ) ) ) { // phpcs:ignore WordPress.DB.PreparedSQL
+				return false;
+			}
+		}
+		return true;
+	}
+
+	public static function restaurar_turma( array $turma, $user_id ) {
+		global $wpdb;
+		$unidade = isset( $turma['unidadeId'] ) ? (string) $turma['unidadeId'] : '';
+		$status  = isset( $turma['status'] ) && in_array( $turma['status'], array( 'solicitado', 'elaboracao', 'validacao', 'validado', 'arquivado' ), true ) ? $turma['status'] : 'elaboracao';
+		$versao  = isset( $turma['versao'] ) ? max( 1, (int) $turma['versao'] ) : 1;
+		$rev     = isset( $turma['rev'] ) ? max( 1, (int) $turma['rev'] ) : 1;
+		$prazo   = isset( $turma['prazo'] ) && Cronograma_EAD_Rules::data_ok( (string) $turma['prazo'] ) ? $turma['prazo'] : null;
+		$data    = $turma;
+		unset( $data['unidadeId'] );
+		foreach ( Cronograma_EAD_Rules::META as $k ) {
+			unset( $data[ $k ] );
+		}
+		$now = self::agora();
+		return false !== $wpdb->insert(
+			self::t( 'turmas' ),
+			array(
+				'id' => $turma['id'],
+				'unidade_id' => $unidade,
+				'status' => $status,
+				'versao' => $versao,
+				'rev' => $rev,
+				'prazo' => $prazo,
+				'data' => wp_json_encode( Cronograma_EAD_Rules::para_saida( $data ) ),
+				'criado_em' => $now,
+				'atualizado_em' => $now,
+				'atualizado_por' => (int) $user_id,
+			)
+		);
+	}
+
 	/* ---------- versões ---------- */
 
 	public static function salvar_versao( $turma_id, $versao, $snapshot, $user_id, $nome, $ressalva ) {

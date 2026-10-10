@@ -11,8 +11,9 @@ import { abaPedida, pedidoAberto } from '@/lib/avisos'
 import { root } from '@/lib/root'
 import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
-import { compute, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, fimFaseIntensivaAprendizagem, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
+import { compute, simularRecalculoPeriodo, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, fimFaseIntensivaAprendizagem, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
 import { quando } from '@/lib/format'
+import { aplicarConfiguracaoTurma, resolverPerfilCronograma, MODELO_LABEL } from '@/lib/scheduleProfiles'
 import type { ExportEntrada } from '@/lib/export'
 import type { Encontro, ItemTurma } from '@/lib/types'
 import { Timeline } from './Timeline'
@@ -68,7 +69,8 @@ function CronogramaAberto() {
   }, [avs, turmaId, lerAvisos])
 
   const t = d.turmas.find(x => x.id === turmaId) || d.turmas[0]
-  const curso = t ? d.cursos.find(c => c.id === t.cursoId) : undefined
+  const cursoBase = t ? d.cursos.find(c => c.id === t.cursoId) : undefined
+  const curso = cursoBase ? aplicarConfiguracaoTurma(cursoBase, t) : undefined
   const G = useMemo(() => (t && curso ? compute(t, curso, d.feriados) : null), [t, curso, d.feriados])
   const avisos = useMemo(() => (t && G ? verificar(t, G, d.feriados) : []), [t, G, d.feriados])
   const ruins = useMemo(() => encontrosRuins(avisos), [avisos])
@@ -88,7 +90,7 @@ function CronogramaAberto() {
   }, [podeCalcular, t?.id, t?.inicio, G, d.feriados]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ao mudar o início, as datas dos encontros são recalculadas junto (as digitadas antes deixam de valer).
-  const mudarInicio = (v: string) => update(x => { const tt = x.turmas.find(a => a.id === t!.id); if (!tt) return; tt.inicio = v; for (const k of Object.keys(tt.itens)) { if (tt.itens[k]?.enc) delete tt.itens[k].enc; if (tt.itens[k]?.sin) delete tt.itens[k].sin } })
+  const mudarInicio = (v: string) => update(x => { const tt = x.turmas.find(a => a.id === t!.id); if (!tt) return; tt.inicio = v; for (const k of Object.keys(tt.itens)) { if (tt.itens[k]?.enc) delete tt.itens[k].enc; if (tt.itens[k]?.sin) delete tt.itens[k].sin; if (!curso?.modulos.some(m => m.itens.some(it => it.id === k && it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) delete tt.itens[k].inicioPlanejado } })
 
   if (!t) return <Empty titulo={T.cron.semTurma.titulo} texto={T.cron.semTurma.texto} acao={T.cron.semTurma.acao} onAcao={() => go('turmas')} />
   // Solicitação de um curso ainda não cadastrado: só há o pedido; a Unidigit@l cadastra o curso antes de iniciar.
@@ -141,17 +143,34 @@ function CronogramaAberto() {
   const R = curso.regras
   // Datas com problema: corrige automaticamente (todas ou só uma) e leva o olhar até a data na tabela.
   const corrigir = (so?: string) => update(x => { const tt = x.turmas.find(a => a.id === t.id)!; for (const [id, enc] of Object.entries(corrigirEncontros(t, G, d.feriados, ruins, so))) tt.itens[id] = { ...(tt.itens[id] || {}), enc } })
-  const verNaTabela = (item: string, ix: number) => {
+  const verNaTabela = (item: string, ix: number, tipo: 'presencial' | 'sincrono') => {
     const nome = G.by[item]?.it.nome
     setAba('cronograma'); setVisao('tabela'); setModulo('todos')
-    setTimeout(() => { const el = root.el?.querySelector<HTMLElement>(`[aria-label="Data do ${ix + 1}º encontro de ${nome}"]`); el?.scrollIntoView({ block: 'center', behavior: 'smooth' }); el?.focus({ preventScroll: true }) }, 120)
+    const rotulo = tipo === 'sincrono' ? 'momento síncrono' : 'encontro presencial'
+    setTimeout(() => {
+      const el = root.el?.querySelector<HTMLElement>(`[aria-label="Data do ${ix + 1}º ${rotulo} de ${nome}"]`)
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el?.focus({ preventScroll: true })
+    }, 120)
+  }
+  const irAoErro = (a: typeof avisos[number]) => {
+    if (a.ref) return verNaTabela(a.ref.item, a.ref.ix, a.ref.tipo)
+    if (a.campo === 'inicio' || a.campo === 'fim') {
+      setAba('dados')
+      setTimeout(() => {
+        const seletor = a.campo === 'inicio' ? '[aria-label="Início da turma"]' : '[aria-label="Término previsto"]'
+        const el = root.el?.querySelector<HTMLElement>(seletor)
+        el?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        el?.focus({ preventScroll: true })
+      }, 120)
+    }
   }
   if (t.status === 'solicitado' || curso.resumo) {
     return (
       <div className="flex flex-col gap-4">
         <NavCronograma turmaId={t.id} />
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div className="min-w-0"><div className="kicker">Solicitação de turma</div><h1 className="text-2xl font-semibold">{t.nome || 'Turma sem nome'}</h1><p className="text-sm text-muted-foreground">Unidade {unidadeNome} · {curso.nome}</p></div>
+          <div className="min-w-0"><div className="kicker">Solicitação de turma</div><h1 className="text-2xl font-semibold">{t.nome || 'Turma sem nome'}</h1><p className="text-sm text-muted-foreground">Unidade {unidadeNome} · {curso.nome} · {MODELO_LABEL[curso.modeloCronograma || 'qualificacao']}</p></div>
         </div>
         <FluxoBar t={t} bloqueios={0} />
         <CursoPendente t={t} />
@@ -172,7 +191,60 @@ function CronogramaAberto() {
   const inicio = G.rows[0]?.c.J || t.inicio
   const semUCs = G.rows.length === 0
   const fimTxt = t.fimManual ? fmt(t.fimManual) : G.end ? fmt(G.end) : ''
+  const perfilDias = resolverPerfilCronograma(curso)
+  const diasNomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+  const alterarDias = (tipo: 'presencial' | 'sincrono' | 'estudo', dia: number) => update(x => {
+    const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
+    const cfg = tt.configuracaoCronograma || {}
+    const atual = tipo === 'estudo'
+      ? perfilDias.diasEstudoPermitidos
+      : perfilDias[tipo].diasPermitidos
+    const novo = atual.includes(dia) ? atual.filter(d => d !== dia) : [...atual, dia].sort((a, b) => a - b)
+    if (!novo.length) return
+    tt.personalizarCronograma = true
+    if (tipo === 'estudo') tt.configuracaoCronograma = { ...cfg, diasEstudoPermitidos: novo }
+    else tt.configuracaoCronograma = { ...cfg, [tipo]: { ...(cfg[tipo] || {}), diasPermitidos: novo } }
+  })
+  const restaurarDias = () => update(x => {
+    const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
+    const cfg = { ...(tt.configuracaoCronograma || {}) }
+    delete cfg.diasEstudoPermitidos
+    if (cfg.presencial) { cfg.presencial = { ...cfg.presencial }; delete cfg.presencial.diasPermitidos }
+    if (cfg.sincrono) { cfg.sincrono = { ...cfg.sincrono }; delete cfg.sincrono.diasPermitidos }
+    tt.configuracaoCronograma = cfg
+  })
   const setFim = (v: string) => update(x => { const a = x.turmas.find(a => a.id === t.id)!; if (v && v !== G.end) a.fimManual = v; else delete a.fimManual })
+  const recalcularPeriodo = () => {
+    if (!podeCalcular || !t.inicio || !t.fimManual) return
+    const semMarcos = { ...t, itens: Object.fromEntries(Object.entries(t.itens).map(([id, it]) => [id, { ...it, inicioPlanejado: curso.modulos.some(m => m.itens.some(item => item.id === id && item.tipo === 'intro' && item.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação')) ? it.inicioPlanejado : undefined }])) }
+    const sim = simularRecalculoPeriodo(semMarcos, curso, d.feriados, t.fimManual)
+    if (!sim.ok) { window.alert(sim.motivo); return }
+    const marcos = Object.fromEntries(sim.plano.rows
+      .filter(r => r.it.tipo !== 'intro' && r.c.J)
+      .map(r => [r.it.id, r.c.J!]))
+    const itensSimulados = { ...semMarcos.itens }
+    for (const [id, data] of Object.entries(marcos))
+      itensSimulados[id] = { ...(itensSimulados[id] || {}), inicioPlanejado: data }
+    const teste = compute({ ...semMarcos, itens: itensSimulados }, curso, d.feriados)
+    if (teste.end !== t.fimManual || teste.rows.some((r, i) =>
+      i > 0 && r.it.tipo === 'uc' && r.c.J && teste.rows[i - 1].c.K && r.c.J <= teste.rows[i - 1].c.K!)) {
+      window.alert('O calendário não alcançou o término solicitado sem conflitos. Nenhum dado foi alterado.')
+      return
+    }
+    if (!window.confirm('Recalcular o período até ' + fmt(t.fimManual) + '? As UCs serão redistribuídas e os encontros/síncronos já digitados serão substituídos.')) return
+    update(x => {
+      const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
+      for (const [id, item] of Object.entries(tt.itens)) {
+        if (curso.modulos.some(m => m.itens.some(it => it.id === id && it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) continue
+        delete item.inicioPlanejado; delete item.enc; delete item.sin
+      }
+      for (const [id, data] of Object.entries(marcos))
+        tt.itens[id] = { ...(tt.itens[id] || {}), inicioPlanejado: data }
+      const g = compute(tt, curso, x.feriados)
+      for (const [id, enc] of Object.entries(planejarEncontros(tt, g, x.feriados, false))) tt.itens[id] = { ...(tt.itens[id] || {}), enc }
+      for (const [id, sin] of Object.entries(planejarSincronicos(tt, g, x.feriados, false))) tt.itens[id] = { ...(tt.itens[id] || {}), sin }
+    })
+  }
 
   const colsEquipe = gv.equipe ? 2 : 0, colsEnc = gv.encontros ? 7 : 0, colsPres = gv.presencial ? 3 : 0, colsSup = grupos.suporte && me.perfil === 'equipe' ? 6 : 0
   const ncol = 9 + colsEquipe + colsEnc + colsPres + colsSup
@@ -218,10 +290,37 @@ function CronogramaAberto() {
           <Field label="Início da turma"><input type="date" className="field-input" disabled={!podeCalcular} value={t.inicio} onChange={e => mudarInicio(e.target.value)} /></Field>
           <Field label={G.end ? 'Término previsto' : 'Término previsto (informe uma data possível)'}>
             <input type="date" className="field-input" disabled={!podeCalcular} value={t.fimManual || G.end || ''} onChange={e => setFim(e.target.value)} />
+            {podeCalcular && t.fimManual && <button type="button" className="mt-2 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground" onClick={recalcularPeriodo}>Recalcular cronograma até o término</button>}
             {G.end && (t.fimManual
               ? <p className="mt-1 text-xs text-muted-foreground">Data alterada manualmente. Calculado: <b className="mono">{fmt(G.end)}</b>{t.fimManual < G.end ? ' (a nova data é anterior ao cálculo)' : ''}. {podeCalcular && <button type="button" className="underline" onClick={() => setFim('')}>Voltar ao cálculo</button>}</p>
               : <p className="mt-1 text-xs text-muted-foreground">Calculado pelas cargas e feriados. Você pode estender ou alterar a data.</p>)}
           </Field>
+          {curso.modulos.flatMap(m => m.itens).filter(it => it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação').map(it => (
+            <Field key={it.id} label="Data da Ambientação (manual, fora da CH)">
+              <input type="date" className="field-input" disabled={!podeCalcular} value={t.itens[it.id]?.inicioPlanejado || ''} onChange={e => setItem(it.id, { inicioPlanejado: e.target.value })} />
+            </Field>
+          ))}
+          <div className="sm:col-span-3 rounded-lg border bg-secondary/30 p-3">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div><h3 className="font-semibold">Dias permitidos nesta turma</h3><p className="text-xs text-muted-foreground">Personalize os dias de encontros, momentos síncronos e estudo para qualquer modelo, sem alterar o curso original.</p></div>
+              {podeCalcular && <button type="button" className="rounded-md border bg-card px-3 py-2 text-xs" onClick={restaurarDias}>Restaurar dias do curso</button>}
+            </div>
+            {([
+              ['presencial', 'Encontros presenciais', perfilDias.presencial.diasPermitidos],
+              ['sincrono', 'Momentos síncronos', perfilDias.sincrono.diasPermitidos],
+              ['estudo', 'Estudo / cronograma EaD', perfilDias.diasEstudoPermitidos],
+            ] as const).map(([tipo, rotulo, dias]) => (
+              <fieldset key={tipo} className="mb-3 last:mb-0">
+                <legend className="mb-1 text-sm font-semibold">{rotulo}</legend>
+                <div className="flex flex-wrap gap-2">
+                  {diasNomes.map((nome, dia) => <label key={dia} className="inline-flex min-h-[44px] cursor-pointer items-center gap-1.5 rounded-md border bg-card px-2.5 text-sm">
+                    <input type="checkbox" disabled={!podeCalcular || (dias.length === 1 && dias.includes(dia))} checked={dias.includes(dia)} onChange={() => alterarDias(tipo, dia)} />
+                    {nome}
+                  </label>)}
+                </div>
+              </fieldset>
+            ))}
+          </div>
           <Field label="Nome da turma"><input className="field-input" disabled={!podeCalcular} value={t.nome} onChange={e => update(x => { x.turmas.find(a => a.id === t.id)!.nome = e.target.value })} /></Field>
           {comPres && <Field label="Ambiente"><input className="field-input" disabled={lAj} value={t.ambiente} onChange={e => update(x => { x.turmas.find(a => a.id === t.id)!.ambiente = e.target.value })} /></Field>}
         </div>
@@ -256,7 +355,7 @@ function CronogramaAberto() {
           {problemas.length ? <AlertTriangle size={16} className="text-warn" /> : <CheckCircle2 size={16} className="text-ok" />}
           <h2 className="font-heading text-sm font-semibold">{T.cron.verif.titulo}</h2>
           <span className={`rounded-full px-2 py-0.5 text-xs ${problemas.length ? 'bg-warn-soft text-warn' : 'bg-ok-soft text-ok'}`}>{problemas.length ? T.cron.verif.alertas(problemas.length) : T.cron.verif.tudoCerto}</span>
-          {ruins.size > 0 && !lAj && <button type="button" onClick={() => corrigir()} className="ml-auto rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110">Corrigir {ruins.size === 1 ? 'a data' : `as ${ruins.size} datas`} automaticamente</button>}
+          {[...ruins].some(k => k.startsWith('presencial:')) && !lAj && <button type="button" onClick={() => corrigir()} className="ml-auto rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110">Corrigir datas presenciais automaticamente</button>}
           {ruins.size > 0 && lAj && <span className="ml-auto text-xs text-muted-foreground">Datas em vermelho: só quem pode editar este cronograma consegue corrigir.</span>}
         </div>
         <ul className="flex flex-col gap-1.5 border-t px-4 py-3">
@@ -268,10 +367,10 @@ function CronogramaAberto() {
                   <span className="min-w-0 flex-1"><b className="font-heading uppercase tracking-wide text-[11px]">{a.area}</b>{' '}
                     {partes.map((p, k) => <span key={k}>{k > 0 && <b className="rounded bg-destructive px-1 py-px font-bold text-destructive-foreground">{a.dt}</b>}{p}</span>)}
                   </span>
-                  {a.ref && (
+                  {(a.ref || a.campo) && (
                     <span className="flex shrink-0 gap-1.5">
-                      <button type="button" onClick={() => verNaTabela(a.ref!.item, a.ref!.ix)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ver na tabela</button>
-                      {!lAj && <button type="button" onClick={() => corrigir(`${a.ref!.item}:${a.ref!.ix}`)} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
+                      <button type="button" onClick={() => irAoErro(a)} className="rounded-md border border-current/30 bg-card px-2 py-0.5 text-xs font-medium text-foreground hover:bg-secondary">Ir ao erro</button>
+                      {!lAj && a.ref?.tipo === 'presencial' && <button type="button" onClick={() => { const ref = a.ref; if (ref?.tipo === 'presencial') corrigir(`presencial:${ref.item}:${ref.ix}`) }} className="rounded-md bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground hover:brightness-110">Corrigir esta data</button>}
                     </span>
                   )}
                 </li>
@@ -356,7 +455,7 @@ function CronogramaAberto() {
                     return Array.from({ length: span }).map((_, i) => {
                       const e = mom[i] ?? ({ d: '', h: R.horario, w: R.webHora, tipo: 'presencial' } as MomentoInstrucional), semEnc = !mom[i]
                       const tipoIx = mom.slice(0, i + 1).filter(x => x.tipo === e.tipo).length
-                      const ruim = e.tipo === 'presencial' && it.tipo === 'uc' && ruins.has(`${it.id}:${tipoIx - 1}`)
+                      const ruim = it.tipo === 'uc' && ruins.has(`${e.tipo}:${it.id}:${tipoIx - 1}`)
                       return (
                         <tr key={`${it.id}-${i}`}>
                           {i === 0 && (
@@ -433,14 +532,16 @@ function CronogramaAberto() {
           <div className="overflow-x-auto rounded-lg border bg-card">
             <table className="w-full min-w-[760px] text-sm">
               <thead><tr className="border-b bg-secondary text-left"><th className="px-3 py-2">Unidade curricular</th><th className="px-3 py-2">Nº</th><th className="px-3 py-2">Data da webaula</th><th className="px-3 py-2">Dia</th><th className="px-3 py-2">Horário</th><th className="px-3 py-2">Fase</th></tr></thead>
-              <tbody>{linhas.length ? linhas.map(({ r, e, ix }) => <tr key={`${r.it.id}-web-${ix}`} className="border-b">
+              <tbody>{linhas.length ? linhas.map(({ r, e, ix }) => {
+                const ruimWeb = ruins.has(`sincrono:${r.it.id}:${ix}`)
+                return <tr key={`${r.it.id}-web-${ix}`} className="border-b">
                 <td className="px-3 py-2 font-medium">{r.it.nome}</td>
                 <td className="mono px-3 py-2">{ix + 1}º</td>
-                <td className="px-2 py-1"><input type="date" disabled={lAj} className="cell-input mono w-[145px]" value={e.d} onChange={ev => setSin(r, ix, { d: ev.target.value })} /></td>
+                <td className={`px-2 py-1 ${ruimWeb ? 'bg-bad-soft' : ''}`}><input type="date" disabled={lAj} aria-invalid={ruimWeb || undefined} aria-label={`Data do ${ix + 1}º momento síncrono de ${r.it.nome}`} title={ruimWeb ? 'Esta data está fora das regras do cronograma. Veja em Verificações.' : undefined} className={`cell-input mono w-[145px] ${ruimWeb ? '!font-bold !text-destructive ring-2 ring-destructive' : ''}`} value={e.d} onChange={ev => setSin(r, ix, { d: ev.target.value })} /></td>
                 <td className="px-3 py-2">{e.d ? ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'][dow(toN(e.d))] : '—'}</td>
                 <td className="px-2 py-1"><input disabled={lAj} className="cell-input min-w-[155px]" value={e.h} onChange={ev => setSin(r, ix, { h: ev.target.value })} /></td>
                 <td className="px-3 py-2">{e.d && fimIntensivo && e.d <= fimIntensivo ? 'Intensiva' : 'Semanal'}</td>
-              </tr>) : <tr><td colSpan={6} className="px-3 py-5 text-center text-muted-foreground">Informe a data de início da turma para gerar as webaulas.</td></tr>}</tbody>
+              </tr>}) : <tr><td colSpan={6} className="px-3 py-5 text-center text-muted-foreground">Informe a data de início da turma para gerar as webaulas.</td></tr>}</tbody>
             </table>
           </div>
           <p className="text-xs text-muted-foreground">As datas são recalculadas automaticamente quando o início da turma, os feriados ou a regra de atendimento do curso mudam. Datas alteradas manualmente são preservadas até um recálculo completo.</p>

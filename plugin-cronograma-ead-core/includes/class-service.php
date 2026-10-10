@@ -171,6 +171,9 @@ class Cronograma_EAD_Service {
 
 	public static function bootstrap() {
 		$perfil = self::perfil();
+		if ( 'equipe' === $perfil ) {
+			self::sincronizar_feriados_automaticos();
+		}
 		$uids   = self::unidades_do_usuario();
 		$cat    = Cronograma_EAD_Store::get();
 		$data   = $cat['data'];
@@ -654,6 +657,302 @@ class Cronograma_EAD_Service {
 		return $saved;
 	}
 
+	/** Normaliza objetos associativos antes do hash para sobreviver ao transporte JSON/REST. */
+	private static function canonicalizar_backup( $valor ) {
+		if ( ! is_array( $valor ) ) {
+			return $valor;
+		}
+		$keys = array_keys( $valor );
+		$is_list = $keys === range( 0, count( $valor ) - 1 );
+		$out = array();
+		if ( $is_list ) {
+			foreach ( $valor as $item ) {
+				$out[] = self::canonicalizar_backup( $item );
+			}
+			return $out;
+		}
+		ksort( $valor, SORT_STRING );
+		foreach ( $valor as $key => $item ) {
+			$out[ $key ] = self::canonicalizar_backup( $item );
+		}
+		return $out;
+	}
+
+	private static function checksum_backup( $catalogo, $turmas ) {
+		return hash(
+			'sha256',
+			wp_json_encode(
+				self::canonicalizar_backup(
+					array(
+						'catalogo' => $catalogo,
+						'turmas' => $turmas,
+					)
+				)
+			)
+		);
+	}
+
+	/** Consulta e armazena em cache os feriados nacionais brasileiros. */
+	public static function feriados_nacionais( $ano ) {
+		$ano = (int) $ano;
+		if ( $ano < 1900 || $ano > 2199 ) {
+			return self::erro( 'ano', 'Ano inválido para consulta de feriados.', 400 );
+		}
+		$key = 'cronograma_ead_feriados_br_' . $ano;
+		$cached = get_transient( $key );
+		if ( is_array( $cached ) ) {
+			return array( 'ano' => $ano, 'feriados' => $cached, 'cache' => true, 'fonte' => 'cache' );
+		}
+
+		$out = array();
+		$url = 'https://brasilapi.com.br/api/feriados/v1/' . $ano;
+		$res = wp_safe_remote_get( $url, array( 'timeout' => 8, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
+		if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
+			$body = json_decode( wp_remote_retrieve_body( $res ), true );
+			if ( is_array( $body ) ) {
+				foreach ( $body as $item ) {
+					if ( ! is_array( $item ) ) {
+						continue;
+					}
+					$data = isset( $item['date'] ) ? sanitize_text_field( (string) $item['date'] ) : '';
+					$nome = isset( $item['name'] ) ? sanitize_text_field( (string) $item['name'] ) : 'Feriado nacional';
+					if ( Cronograma_EAD_Rules::data_ok( $data ) ) {
+						$out[] = array( $data, $nome );
+					}
+				}
+			}
+		}
+		$fonte = 'brasilapi';
+
+		// Fallback local: mantém o calendário funcional mesmo se o serviço externo estiver indisponível.
+		if ( ! $out ) {
+			$fixos = array(
+				'01-01' => 'Confraternização Universal',
+				'04-21' => 'Tiradentes',
+				'05-01' => 'Dia Mundial do Trabalho',
+				'09-07' => 'Independência do Brasil',
+				'10-12' => 'Nossa Senhora Aparecida',
+				'11-02' => 'Finados',
+				'11-15' => 'Proclamação da República',
+				'11-20' => 'Dia Nacional de Zumbi e da Consciência Negra',
+				'12-25' => 'Natal',
+			);
+			foreach ( $fixos as $md => $nome ) {
+				$out[] = array( sprintf( '%04d-%s', $ano, $md ), $nome );
+			}
+			// Datas móveis usadas no calendário educacional brasileiro.
+			$pascoa = new DateTimeImmutable( '@' . easter_date( $ano ) );
+			$pascoa = $pascoa->setTimezone( new DateTimeZone( 'UTC' ) );
+			foreach ( array(
+				-48 => 'Carnaval',
+				-47 => 'Carnaval',
+				-2  => 'Paixão de Cristo',
+				60  => 'Corpus Christi',
+			) as $dias => $nome ) {
+				$data = $pascoa->modify( ( $dias >= 0 ? '+' : '' ) . $dias . ' days' )->format( 'Y-m-d' );
+				$out[] = array( $data, $nome );
+			}
+			usort( $out, function ( $a, $b ) { return strcmp( $a[0], $b[0] ); } );
+			$fonte = 'fallback-local';
+		}
+		set_transient( $key, $out, 30 * DAY_IN_SECONDS );
+		return array( 'ano' => $ano, 'feriados' => $out, 'cache' => false, 'fonte' => $fonte );
+	}
+
+	/** Municípios oficiais de uma UF, com código IBGE. */
+	public static function municipios_uf( $uf ) {
+		$uf = strtoupper( sanitize_text_field( (string) $uf ) );
+		$ufs = array( 'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO' );
+		if ( ! in_array( $uf, $ufs, true ) ) {
+			return self::erro( 'uf', 'UF inválida para consulta de municípios.', 400 );
+		}
+		$key = 'cronograma_ead_municipios_' . strtolower( $uf );
+		$cached = get_transient( $key );
+		if ( is_array( $cached ) ) {
+			return array( 'uf' => $uf, 'municipios' => $cached, 'cache' => true );
+		}
+		$url = 'https://brasilapi.com.br/api/ibge/municipios/v1/' . rawurlencode( $uf );
+		$res = wp_safe_remote_get( $url, array( 'timeout' => 10, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
+		if ( is_wp_error( $res ) || 200 !== (int) wp_remote_retrieve_response_code( $res ) ) {
+			return self::erro( 'municipios_indisponiveis', 'Não foi possível consultar os municípios agora.', 502 );
+		}
+		$body = json_decode( wp_remote_retrieve_body( $res ), true );
+		$out = array();
+		foreach ( (array) $body as $m ) {
+			if ( ! is_array( $m ) ) continue;
+			$nome = isset( $m['nome'] ) ? sanitize_text_field( (string) $m['nome'] ) : '';
+			$codigo = isset( $m['codigo_ibge'] ) ? preg_replace( '/\D+/', '', (string) $m['codigo_ibge'] ) : ( isset( $m['id'] ) ? preg_replace( '/\D+/', '', (string) $m['id'] ) : '' );
+			if ( $nome && preg_match( '/^\d{7}$/', $codigo ) ) {
+				$out[] = array( 'nome' => $nome, 'codigoIbge' => $codigo );
+			}
+		}
+		usort( $out, function( $a, $b ) { return strcasecmp( $a['nome'], $b['nome'] ); } );
+		set_transient( $key, $out, 30 * DAY_IN_SECONDS );
+		return array( 'uf' => $uf, 'municipios' => $out, 'cache' => false );
+	}
+
+	public static function feriados_config() {
+		return array( 'municipalConfigurado' => '' !== trim( (string) get_option( 'cronograma_ead_feriados_api_key', '' ) ) );
+	}
+
+	public static function feriados_config_salvar( $body ) {
+		$key = isset( $body['apiKey'] ) ? sanitize_text_field( (string) $body['apiKey'] ) : '';
+		if ( strlen( $key ) > 190 ) {
+			return self::erro( 'api_key', 'Chave da API de feriados inválida.', 400 );
+		}
+		update_option( 'cronograma_ead_feriados_api_key', $key, false );
+		Cronograma_EAD_DB::audit_admin( 'config_feriados_municipais', 'config', '', $key ? 'configurado' : 'removido' );
+		return array( 'municipalConfigurado' => '' !== $key );
+	}
+
+	private static function normalizar_nome_localidade( $s ) {
+		$s = remove_accents( strtolower( trim( (string) $s ) ) );
+		return preg_replace( '/[^a-z0-9]+/', '', $s );
+	}
+
+	/** Resolve o código IBGE pelo par cidade + UF quando a unidade ainda não o possui. */
+	private static function resolver_ibge_unidade( $unidade ) {
+		$codigo = isset( $unidade['codigoIbge'] ) ? preg_replace( '/\D+/', '', (string) $unidade['codigoIbge'] ) : '';
+		if ( preg_match( '/^\d{7}$/', $codigo ) ) return $codigo;
+		$uf = isset( $unidade['estado'] ) ? strtoupper( (string) $unidade['estado'] ) : '';
+		$cidade = isset( $unidade['cidade'] ) ? (string) $unidade['cidade'] : '';
+		if ( ! $uf || ! $cidade ) return '';
+		$r = self::municipios_uf( $uf );
+		if ( is_wp_error( $r ) ) return '';
+		$alvo = self::normalizar_nome_localidade( $cidade );
+		foreach ( $r['municipios'] as $m ) {
+			if ( self::normalizar_nome_localidade( $m['nome'] ) === $alvo ) return $m['codigoIbge'];
+		}
+		return '';
+	}
+
+	/** Calendário estadual + municipal da unidade. Nacionais continuam no calendário geral. */
+	public static function feriados_local( $unidade_id, $ano ) {
+		$ano = (int) $ano;
+		if ( $ano < 1900 || $ano > 2199 ) return self::erro( 'ano', 'Ano inválido.', 400 );
+		$cat = Cronograma_EAD_Store::get();
+		$unidade = null;
+		foreach ( $cat['data']['unidades'] as $u ) {
+			if ( isset( $u['id'] ) && (string) $u['id'] === (string) $unidade_id ) { $unidade = $u; break; }
+		}
+		if ( ! $unidade ) return self::erro( 'unidade', 'Unidade não encontrada.', 404 );
+		$uf = isset( $unidade['estado'] ) ? strtoupper( (string) $unidade['estado'] ) : '';
+		$cidade = isset( $unidade['cidade'] ) ? sanitize_text_field( (string) $unidade['cidade'] ) : '';
+		$ibge = self::resolver_ibge_unidade( $unidade );
+		if ( ! $uf || ! $cidade || ! $ibge ) return self::erro( 'localidade', 'Cadastre uma cidade e um estado válidos para a unidade.', 422 );
+
+		$cache_key = 'cronograma_ead_feriados_local_' . md5( $unidade_id . '|' . $ano . '|' . $uf . '|' . $ibge );
+		$cached = get_transient( $cache_key );
+		if ( is_array( $cached ) ) return $cached;
+
+		$out = array();
+		$avisos = array();
+		$nacionais = self::feriados_nacionais( $ano );
+		$datas_nacionais = array();
+		if ( ! is_wp_error( $nacionais ) ) foreach ( $nacionais['feriados'] as $h ) $datas_nacionais[ $h[0] ] = true;
+
+		// BrasilAPI: nacionais + estaduais da UF. Mantemos apenas os extras estaduais.
+		$url_estado = add_query_arg( 'uf', $uf, 'https://brasilapi.com.br/api/feriados/v1/' . $ano );
+		$res = wp_safe_remote_get( $url_estado, array( 'timeout' => 10, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
+		if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
+			$body_estado = json_decode( wp_remote_retrieve_body( $res ), true );
+			if ( ! is_array( $body_estado ) ) {
+				$avisos[] = 'A fonte estadual retornou dados inválidos.';
+				$body_estado = array();
+			}
+			foreach ( $body_estado as $item ) {
+				if ( ! is_array( $item ) ) continue;
+				$data = isset( $item['date'] ) ? sanitize_text_field( (string) $item['date'] ) : '';
+				$nome = isset( $item['name'] ) ? sanitize_text_field( (string) $item['name'] ) : 'Feriado estadual';
+				if ( Cronograma_EAD_Rules::data_ok( $data ) && ! isset( $datas_nacionais[ $data ] ) ) $out[] = array( $data, $nome, 'estadual', 'BrasilAPI' );
+			}
+		} else {
+			$avisos[] = 'Não foi possível atualizar os feriados estaduais agora.';
+		}
+
+		$api_key = trim( (string) get_option( 'cronograma_ead_feriados_api_key', '' ) );
+		if ( $api_key ) {
+			$url_mun = add_query_arg( 'ano', $ano, 'https://feriadosapi.com/api/v1/feriados/cidade/' . rawurlencode( $ibge ) );
+			$resm = wp_safe_remote_get( $url_mun, array( 'timeout' => 12, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json', 'X-API-Key' => $api_key ) ) );
+			if ( ! is_wp_error( $resm ) && 200 === (int) wp_remote_retrieve_response_code( $resm ) ) {
+				$bodym = json_decode( wp_remote_retrieve_body( $resm ), true );
+				if ( ! is_array( $bodym ) || ( isset( $bodym['feriados'] ) && ! is_array( $bodym['feriados'] ) ) ) {
+					$avisos[] = 'A fonte municipal retornou dados inválidos.';
+					$lista_municipal = array();
+				} else {
+					$lista_municipal = isset( $bodym['feriados'] ) ? $bodym['feriados'] : $bodym;
+				}
+				foreach ( $lista_municipal as $item ) {
+					if ( ! is_array( $item ) ) continue;
+					$raw = isset( $item['data'] ) ? sanitize_text_field( (string) $item['data'] ) : '';
+					$data = $raw;
+					if ( preg_match( '/^(\d{2})\/(\d{2})\/(\d{4})$/', $raw, $m ) ) $data = $m[3] . '-' . $m[2] . '-' . $m[1];
+					$nome = isset( $item['nome'] ) ? sanitize_text_field( (string) $item['nome'] ) : 'Feriado municipal';
+					$tipo = isset( $item['tipo'] ) ? strtoupper( sanitize_text_field( (string) $item['tipo'] ) ) : 'MUNICIPAL';
+					if ( Cronograma_EAD_Rules::data_ok( $data ) && 'MUNICIPAL' === $tipo ) $out[] = array( $data, $nome, 'municipal', 'Feriados API' );
+				}
+			} else {
+				$avisos[] = 'A fonte de feriados municipais não respondeu para esta localidade.';
+			}
+		} else {
+			$avisos[] = 'Feriados municipais ainda não estão habilitados: configure a chave da Feriados API.';
+		}
+		// Remove duplicados por data+tipo+nome.
+		$uniq = array();
+		foreach ( $out as $h ) $uniq[ implode( '|', array( $h[0], $h[2], $h[1] ) ) ] = $h;
+		$out = array_values( $uniq );
+		usort( $out, function( $a, $b ) { return strcmp( $a[0], $b[0] ); } );
+		$ret = array(
+			'unidadeId' => (string) $unidade_id,
+			'ano' => $ano,
+			'localidade' => array( 'cidade' => $cidade, 'uf' => $uf, 'codigoIbge' => $ibge ),
+			'feriados' => $out,
+			'municipalConfigurado' => '' !== $api_key,
+			'avisos' => $avisos,
+		);
+		// Não manter por sete dias um resultado incompleto causado por timeout,
+		// indisponibilidade do provedor ou integração municipal ainda desabilitada.
+		// Cache curto permite reconsulta sem sobrecarregar as fontes externas.
+		$ttl = empty( $avisos ) ? 7 * DAY_IN_SECONDS : 15 * 60;
+		set_transient( $cache_key, $ret, $ttl );
+		return $ret;
+	}
+
+	/** Sincroniza automaticamente o ano atual e o próximo no catálogo institucional. */
+	private static function sincronizar_feriados_automaticos() {
+		if ( get_transient( 'cronograma_ead_auto_feriados_ok' ) ) {
+			return;
+		}
+		$cat = Cronograma_EAD_Store::get();
+		$data = $cat['data'];
+		$existentes = array();
+		foreach ( $data['feriados'] as $f ) {
+			if ( is_array( $f ) && isset( $f[0] ) && ( ! isset( $f[2] ) || '' === $f[2] ) ) {
+				$existentes[ $f[0] ] = true;
+			}
+		}
+		$mudou = false;
+		$ano_atual = (int) gmdate( 'Y' );
+		foreach ( array( $ano_atual, $ano_atual + 1 ) as $ano ) {
+			$r = self::feriados_nacionais( $ano );
+			if ( is_wp_error( $r ) || empty( $r['feriados'] ) ) {
+				continue;
+			}
+			foreach ( $r['feriados'] as $h ) {
+				if ( ! isset( $existentes[ $h[0] ] ) ) {
+					$data['feriados'][] = array( $h[0], $h[1] );
+					$existentes[ $h[0] ] = true;
+					$mudou = true;
+				}
+			}
+		}
+		if ( $mudou ) {
+			usort( $data['feriados'], function ( $a, $b ) { return strcmp( $a[0], $b[0] ); } );
+			Cronograma_EAD_Store::save( $data, (int) $cat['rev'] );
+		}
+		set_transient( 'cronograma_ead_auto_feriados_ok', 1, 12 * HOUR_IN_SECONDS );
+	}
+
 	/** Cópia completa, versionada e verificável por checksum. */
 	public static function exportar() {
 		$cat    = Cronograma_EAD_Store::get();
@@ -661,14 +960,21 @@ class Cronograma_EAD_Service {
 		foreach ( Cronograma_EAD_DB::listar( null ) as $r ) {
 			$turmas[] = self::presentar( $r );
 		}
-		$data = array( 'catalogo' => $cat['data'], 'turmas' => $turmas );
+		$normal_cat = Cronograma_EAD_Store::sanitize_payload( $cat['data'] );
+		$normal_turmas = array();
+		foreach ( $turmas as $turma_exportada ) {
+			$normal = Cronograma_EAD_Store::sanitize_turma( $turma_exportada );
+			$normal_turmas[] = is_wp_error( $normal ) ? $turma_exportada : $normal;
+		}
 		$out = array(
 			'format' => 'cronogramas-ead',
-			'schemaVersion' => 3,
+			'schemaVersion' => 4,
+			'backupMode' => 'full-state',
+			'checksumMode' => 'normalized-v1',
 			'applicationVersion' => CRONOGRAMA_EAD_VERSION,
 			'generatedAt' => gmdate( 'c' ),
 			'siteId' => hash( 'sha256', home_url( '/' ) ),
-			'checksum' => hash( 'sha256', wp_json_encode( $data ) ),
+			'checksum' => self::checksum_backup( is_wp_error( $normal_cat ) ? $cat['data'] : $normal_cat, $normal_turmas ),
 			'catalogo' => $cat['data'],
 			'turmas' => $turmas,
 		);
@@ -682,23 +988,28 @@ class Cronograma_EAD_Service {
 		}
 		$format = isset( $body['format'] ) ? (string) $body['format'] : ( isset( $body['formato'] ) ? (string) $body['formato'] : '' );
 		$schema = isset( $body['schemaVersion'] ) ? (int) $body['schemaVersion'] : ( 'cronogramas-ead-2' === $format ? 2 : 0 );
-		if ( $schema > 3 ) {
+		if ( $schema > 4 ) {
 			return self::erro( 'versao_futura', 'Esta cópia foi criada por uma versão mais nova do sistema.', 422 );
 		}
-		if ( ! in_array( $schema, array( 0, 2, 3 ), true ) ) {
+		if ( ! in_array( $schema, array( 0, 2, 3, 4 ), true ) ) {
 			return self::erro( 'versao', 'Versão de backup não suportada.', 422 );
 		}
 		$cat = Cronograma_EAD_Store::sanitize_payload( $body['catalogo'] );
 		if ( is_wp_error( $cat ) ) {
 			return $cat;
 		}
-		if ( 3 === $schema ) {
+		$checksum_normalizado = isset( $body['checksumMode'] ) && 'normalized-v1' === (string) $body['checksumMode'];
+		if ( in_array( $schema, array( 3, 4 ), true ) ) {
 			if ( 'cronogramas-ead' !== $format || empty( $body['checksum'] ) ) {
-				return self::erro( 'formato', 'Backup versão 3 sem identificação ou checksum válido.', 422 );
+				return self::erro( 'formato', 'Backup sem identificação ou checksum válido.', 422 );
 			}
-			$calc = hash( 'sha256', wp_json_encode( array( 'catalogo' => $body['catalogo'], 'turmas' => $body['turmas'] ) ) );
-			if ( ! hash_equals( (string) $body['checksum'], $calc ) ) {
-				return self::erro( 'checksum', 'A cópia falhou na verificação de integridade.', 422 );
+			if ( ! $checksum_normalizado ) {
+				$calc = self::checksum_backup( $body['catalogo'], $body['turmas'] );
+				// Compatibilidade com backups v3/v4 gerados antes do checksum canônico.
+				$legacy_calc = hash( 'sha256', wp_json_encode( array( 'catalogo' => $body['catalogo'], 'turmas' => $body['turmas'] ) ) );
+				if ( ! hash_equals( (string) $body['checksum'], $calc ) && ! hash_equals( (string) $body['checksum'], $legacy_calc ) ) {
+					return self::erro( 'checksum', 'A cópia falhou na verificação de integridade.', 422 );
+				}
 			}
 		}
 		$validas = array();
@@ -724,12 +1035,32 @@ class Cronograma_EAD_Service {
 			}
 			$validas[] = $t;
 		}
-		return array( 'catalogo' => $cat, 'turmas' => $validas, 'criadas' => $criadas, 'atualizadas' => $atualizadas, 'ignoradas' => $ignoradas, 'schemaVersion' => $schema, 'digest' => hash( 'sha256', wp_json_encode( array( 'catalogo' => $cat, 'turmas' => $validas ) ) ) );
+		if ( $checksum_normalizado ) {
+			$calc_normalizado = self::checksum_backup( $cat, $validas );
+			if ( ! hash_equals( (string) $body['checksum'], $calc_normalizado ) ) {
+				return self::erro( 'checksum', 'A cópia falhou na verificação de integridade.', 422 );
+			}
+		}
+		$modo_completo = 4 === $schema && isset( $body['backupMode'] ) && 'full-state' === $body['backupMode'];
+		if ( $modo_completo ) {
+			$atuais = array();
+			foreach ( Cronograma_EAD_DB::listar( null ) as $row_atual ) {
+				$atuais[ $row_atual->id ] = true;
+			}
+			$ids_backup = array();
+			foreach ( $validas as $t_backup ) {
+				$ids_backup[ $t_backup['id'] ] = true;
+			}
+			$criadas = count( array_diff_key( $ids_backup, $atuais ) );
+			$atualizadas = count( array_intersect_key( $ids_backup, $atuais ) );
+			$ignoradas = 0;
+		}
+		return array( 'catalogo' => $cat, 'turmas' => $validas, 'criadas' => $criadas, 'atualizadas' => $atualizadas, 'ignoradas' => $ignoradas, 'schemaVersion' => $schema, 'fullRestore' => $modo_completo, 'digest' => hash( 'sha256', wp_json_encode( array( 'catalogo' => $cat, 'turmas' => $validas ) ) ) );
 	}
 
 	/** Simula ou executa uma importação de forma atômica. */
 	public static function importar( $body ) {
-		$rate = Cronograma_EAD_Security::rate_limit( 'importar', '', 5, HOUR_IN_SECONDS );
+		$rate = Cronograma_EAD_Security::rate_limit( 'importar', '', 20, HOUR_IN_SECONDS );
 		if ( is_wp_error( $rate ) ) {
 			return $rate;
 		}
@@ -748,35 +1079,94 @@ class Cronograma_EAD_Service {
 		if ( ! isset( $body['rev'] ) ) {
 			return self::erro( 'invalido', 'Revisão atual ausente.', 400 );
 		}
+		$catalog_before = Cronograma_EAD_Store::get();
+		if ( (int) $body['rev'] !== (int) $catalog_before['rev'] ) {
+			return self::erro( 'conflito', 'O catálogo mudou desde a simulação. Recarregue os dados e simule novamente antes de restaurar.', 409 );
+		}
 		$pre_backup = self::exportar();
 		update_option( 'cronograma_ead_pre_import_backup', wp_json_encode( $pre_backup ), false );
 		update_option( 'cronograma_ead_pre_import_backup_at', gmdate( 'c' ), false );
-		Cronograma_EAD_DB::begin();
+		if ( ! Cronograma_EAD_DB::begin() ) {
+			return self::erro( 'transacao', 'Não foi possível iniciar a transação da importação. Nada foi alterado.', 500 );
+		}
 		$saved = Cronograma_EAD_Store::save( $prep['catalogo'], (int) $body['rev'] );
 		if ( is_wp_error( $saved ) ) {
 			Cronograma_EAD_DB::rollback();
 			return $saved;
 		}
-		foreach ( $prep['turmas'] as $t ) {
-			$row = Cronograma_EAD_DB::get( $t['id'] );
-			if ( ! $row ) {
-				if ( ! Cronograma_EAD_DB::inserir( $t, Cronograma_EAD_Rules::S_ELABORACAO, get_current_user_id() ) ) {
+		if ( ! empty( $prep['fullRestore'] ) ) {
+			if ( ! Cronograma_EAD_DB::limpar_para_restauracao() ) {
+				Cronograma_EAD_DB::rollback();
+				Cronograma_EAD_Store::restore_snapshot( $catalog_before );
+				return self::erro( 'restauracao', 'Não foi possível limpar o estado atual para restaurar a cópia. Nada foi alterado.', 500 );
+			}
+			foreach ( $prep['turmas'] as $t ) {
+				if ( ! Cronograma_EAD_DB::restaurar_turma( $t, get_current_user_id() ) ) {
 					Cronograma_EAD_DB::rollback();
-					return self::erro( 'importacao', 'Falha ao criar turma durante a importação. Nada foi alterado.', 500 );
+					Cronograma_EAD_Store::restore_snapshot( $catalog_before );
+					return self::erro( 'restauracao', 'Falha ao restaurar uma turma. Nada foi alterado.', 500 );
 				}
-			} elseif ( in_array( $row->status, array( 'elaboracao', 'solicitado' ), true ) ) {
-				$novo = Cronograma_EAD_Rules::merge_equipe( self::decodificar( $row ), $t, self::ids_do_curso( $prep['catalogo'], $t['cursoId'] ) );
-				if ( ! Cronograma_EAD_DB::atualizar( $row->id, $row->rev, array( 'data' => $novo, 'unidade_id' => $t['unidadeId'] ), get_current_user_id() ) ) {
-					Cronograma_EAD_DB::rollback();
-					return self::erro( 'conflito', 'Uma turma mudou durante a importação. Nada foi alterado.', 409 );
+				if ( ! empty( $t['vigente'] ) && is_array( $t['vigente'] ) ) {
+					$curso_snapshot = null;
+					foreach ( $prep['catalogo']['cursos'] as $curso_cat ) {
+						if ( isset( $curso_cat['id'] ) && $curso_cat['id'] === $t['cursoId'] ) {
+							$curso_snapshot = $curso_cat;
+							break;
+						}
+					}
+					$unidade_snapshot = null;
+					foreach ( $prep['catalogo']['unidades'] as $unidade_cat ) {
+						if ( isset( $unidade_cat['id'] ) && $unidade_cat['id'] === $t['unidadeId'] ) {
+							$unidade_snapshot = $unidade_cat;
+							break;
+						}
+					}
+					$snapshot = array(
+						'turma' => $t,
+						'curso' => $curso_snapshot,
+						'feriados' => self::feriados_da_unidade( $prep['catalogo'], $t['unidadeId'] ),
+						'unidade' => $unidade_snapshot,
+						'versao' => isset( $t['versao'] ) ? (int) $t['versao'] : 1,
+					);
+					if ( ! Cronograma_EAD_DB::salvar_versao(
+						$t['id'],
+						isset( $t['vigente']['versao'] ) ? (int) $t['vigente']['versao'] : ( isset( $t['versao'] ) ? (int) $t['versao'] : 1 ),
+						$snapshot,
+						get_current_user_id(),
+						isset( $t['vigente']['por'] ) ? (string) $t['vigente']['por'] : 'Backup restaurado',
+						isset( $t['vigente']['ressalva'] ) ? (string) $t['vigente']['ressalva'] : ''
+					) ) {
+						Cronograma_EAD_DB::rollback();
+						Cronograma_EAD_Store::restore_snapshot( $catalog_before );
+						return self::erro( 'restauracao', 'Falha ao restaurar o histórico de versões. Nada foi alterado.', 500 );
+					}
+				}
+			}
+		} else {
+			foreach ( $prep['turmas'] as $t ) {
+				$row = Cronograma_EAD_DB::get( $t['id'] );
+				if ( ! $row ) {
+					if ( ! Cronograma_EAD_DB::inserir( $t, Cronograma_EAD_Rules::S_ELABORACAO, get_current_user_id() ) ) {
+						Cronograma_EAD_DB::rollback();
+						Cronograma_EAD_Store::restore_snapshot( $catalog_before );
+						return self::erro( 'importacao', 'Falha ao criar turma durante a importação. Nada foi alterado.', 500 );
+					}
+				} elseif ( in_array( $row->status, array( 'elaboracao', 'solicitado' ), true ) ) {
+					$novo = Cronograma_EAD_Rules::merge_equipe( self::decodificar( $row ), $t, self::ids_do_curso( $prep['catalogo'], $t['cursoId'] ) );
+					if ( ! Cronograma_EAD_DB::atualizar( $row->id, $row->rev, array( 'data' => $novo, 'unidade_id' => $t['unidadeId'] ), get_current_user_id() ) ) {
+						Cronograma_EAD_DB::rollback();
+						Cronograma_EAD_Store::restore_snapshot( $catalog_before );
+						return self::erro( 'conflito', 'Uma turma mudou durante a importação. Nada foi alterado.', 409 );
+					}
 				}
 			}
 		}
 		if ( ! Cronograma_EAD_DB::commit() ) {
 			Cronograma_EAD_DB::rollback();
+			Cronograma_EAD_Store::restore_snapshot( $catalog_before );
 			return self::erro( 'importacao', 'Não foi possível concluir a importação.', 500 );
 		}
-		Cronograma_EAD_DB::audit_admin( 'importar_backup', 'sistema', '', 'ok', array( 'criadas' => $prep['criadas'], 'atualizadas' => $prep['atualizadas'], 'ignoradas' => $prep['ignoradas'] ) );
+		Cronograma_EAD_DB::audit_admin( 'importar_backup', 'sistema', '', 'ok', array( 'modo' => ! empty( $prep['fullRestore'] ) ? 'restauracao_completa' : 'importacao_legada', 'criadas' => $prep['criadas'], 'atualizadas' => $prep['atualizadas'], 'ignoradas' => $prep['ignoradas'] ) );
 		return array( 'rev' => $saved['rev'], 'turmas' => $prep['criadas'] + $prep['atualizadas'], 'puladas' => $prep['ignoradas'], 'criadas' => $prep['criadas'], 'atualizadas' => $prep['atualizadas'], 'ignoradas' => $prep['ignoradas'] );
 	}
 

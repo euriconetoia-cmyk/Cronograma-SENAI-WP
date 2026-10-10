@@ -41,5 +41,28 @@ $WP user meta update "$(uid coord_luz)" ce_unidades '["u_luz"]' --format=json >/
 $WP user meta update "$(uid coord_luz)" ce_validador 1 >/dev/null
 $WP user meta update "$(uid consulta)" ce_unidades '["u_itb"]' --format=json >/dev/null
 
+# O banco do CI e descartável. Criar dados mínimos caso o catálogo inicial esteja vazio.
+$WP eval '
+$state = Cronograma_EAD_Store::get();
+if ( empty( $state["data"]["cursos"] ) ) {
+  $catalog = array(
+    "cursos" => array( array(
+      "id" => "c_teste", "nome" => "Curso de Teste E2E", "categoria" => "qualificacao",
+      "modalidade" => "ead", "chTotal" => 40, "regras" => array(),
+      "modulos" => array( array( "id" => "m_teste", "nome" => "Modulo de Teste",
+        "itens" => array( array( "id" => "i_teste", "tipo" => "uc", "nome" => "UC de Teste", "ch" => 40, "pres" => 0, "div" => 4 ) ) ) )
+    ) ),
+    "pessoas" => array(),
+    "feriados" => array(),
+    "unidades" => array(
+      array( "id" => "u_itb", "nome" => "SENAI Itumbiara", "cidade" => "Itumbiara", "estado" => "GO" ),
+      array( "id" => "u_luz", "nome" => "SENAI Luziania", "cidade" => "Luziania", "estado" => "GO" )
+    )
+  );
+  $saved = Cronograma_EAD_Store::save( $catalog, $state["rev"] );
+  if ( is_wp_error( $saved ) ) { fwrite( STDERR, $saved->get_error_message() . PHP_EOL ); exit( 1 ); }
+}
+' >/dev/null
+
 $WP cron event run cronograma_ead_diario >/dev/null 2>&1 || true
 $WP eval 'echo wp_json_encode(Cronograma_EAD_Pages::ids());'

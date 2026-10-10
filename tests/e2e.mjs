@@ -5,15 +5,50 @@ class Sess{ constructor(){this.c={}}
   sv(r){ for(const s of r.headers.getSetCookie?.()||[]){ const [kv]=s.split(';'); const i=kv.indexOf('='); this.c[kv.slice(0,i)]=kv.slice(i+1) } }
   async req(path,o={}){ const r=await fetch(B+path,{redirect:'manual',...o,headers:{...(o.headers||{}),Cookie:this.ck()}}); this.sv(r); return r }
   async login(u){ this.c={wordpress_test_cookie:'WP%20Cookie%20check'}; const r=await this.req('/wp-login.php',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({log:u,pwd:'senha123','wp-submit':'Log In',redirect_to:B+'/wp-admin/',testcookie:'1'})}); return r.status }
-  async page(id){ const r=await this.req('/?page_id='+id); const t=await r.text(); const m=t.match(/CRONOGRAMA_EAD\s*=\s*(\{.*?\});/s); return {status:r.status,html:t,cfg:m?JSON.parse(m[1]):null} }
+  async page(id){ let r=await this.req('/?page_id='+id); if([301,302,303,307,308].includes(r.status)){ const loc=r.headers.get('location'); if(loc){ const u=new URL(loc,B); r=await this.req(u.pathname+u.search) } } const t=await r.text(); const m=t.match(/CRONOGRAMA_EAD\s*=\s*(\{.*?\});/s); return {status:r.status,html:t,cfg:m?JSON.parse(m[1]):null} }
   async api(method,path,body,nonce){ const r=await this.req('/?rest_route=/cronograma-ead/v1/'+path,{method,headers:{'Content-Type':'application/json','X-WP-Nonce':nonce},body:body===undefined?undefined:JSON.stringify(body)}); let j=null; try{j=await r.json()}catch{} return {status:r.status,j} } }
 const ids=JSON.parse(process.argv[2]); const pid=ids.cronograma
 // anônimo
-{ const s=new Sess(); const h=await s.req('/'); ok(h.status===200,'home anônima 200 (status '+h.status+')'); const p=await s.page(pid); ok(p.status===200 && /Entre com seu usuário/.test(p.html),'página do cronograma pede login') }
+{ const s=new Sess(); const h=await s.req('/'); ok(h.status===200,'home anônima 200 (status '+h.status+')'); const p=await s.page(pid); ok(p.status===200 && /ce-login-gateway/.test(p.html) && !p.cfg,'página do cronograma pede login') }
 const U={}
 for(const u of ['admin','coord_itb','aux_itb','coord_luz','consulta']){ const s=new Sess(); const st=await s.login(u); const p=await s.page(pid); ok(p.status===200&&p.cfg,`${u}: login (${st}) e página carrega com config`); U[u]={s,n:p.cfg?.nonce,perfil:p.cfg?.perfil}; }
 console.log('perfis:',Object.entries(U).map(([k,v])=>k+'='+v.perfil).join(' '))
 ok(U.admin.perfil==='equipe','admin = equipe'); ok(U.coord_itb.perfil==='unidade','coord_itb = unidade'); ok(U.consulta.perfil==='consulta','consulta = consulta')
+// As configurações de credenciais requerem CAP_CONFIG, não apenas CAP_CATALOG.
+{
+  const adminConfig = await U.admin.s.api('GET','feriados/config',undefined,U.admin.n)
+  ok(adminConfig.status===200 && typeof adminConfig.j?.municipalConfigurado==='boolean',
+    'administrador consulta configuração de feriados (200)')
+  // Somente neste banco descartável: testar gravação, leitura sem segredo e remoção.
+  const fakeKey = 'chave-e2e-sem-validade-externa'
+  const created = await U.admin.s.api('POST','feriados/config',{apiKey:fakeKey},U.admin.n)
+  ok(created.status===200 && created.j?.municipalConfigurado===true,
+    'administrador configura credencial sintética de teste')
+  const readBack = await U.admin.s.api('GET','feriados/config',undefined,U.admin.n)
+  ok(readBack.status===200 && readBack.j?.municipalConfigurado===true &&
+    !JSON.stringify(readBack.j).includes(fakeKey),
+    'consulta administrativa confirma configuração sem retornar o segredo')
+  const removed = await U.admin.s.api('POST','feriados/config',{apiKey:''},U.admin.n)
+  ok(removed.status===200 && removed.j?.municipalConfigurado===false,
+    'administrador remove credencial sintética')
+  for (const role of ['coord_itb','aux_itb','consulta']) {
+    const read = await U[role].s.api('GET','feriados/config',undefined,U[role].n)
+    const write = await U[role].s.api('POST','feriados/config',{apiKey:''},U[role].n)
+    ok(read.status===403 && write.status===403,
+      role+' não acessa nem altera credenciais de feriados (403/403)')
+  }
+  const equipe = new Sess()
+  const equipeLogin = await equipe.login('equipe2')
+  const equipePage = await equipe.page(pid)
+  ok(equipeLogin===302 && !!equipePage.cfg,'equipe operacional autentica para testar permissões')
+  if (equipePage.cfg) {
+    const n = equipePage.cfg.nonce
+    const read = await equipe.api('GET','feriados/config',undefined,n)
+    const write = await equipe.api('POST','feriados/config',{apiKey:''},n)
+    ok(read.status===403 && write.status===403,
+      'equipe com permissão de catálogo não altera credenciais (403/403)')
+  }
+}
 const boot=async u=>(await U[u].s.api('GET','bootstrap',undefined,U[u].n))
 let b=await boot('admin'); ok(b.status===200,'bootstrap admin 200'); const turmas=b.j?.turmas||[]; console.log('turmas admin:',turmas.map(t=>t.id+':'+t.status).join(', '))
 const bi=await boot('coord_itb'); ok((bi.j.turmas||[]).every(t=>t.unidadeId==='u_itb'),'coord_itb só vê Itumbiara ('+(bi.j.turmas||[]).length+')')
@@ -21,7 +56,7 @@ const bl=await boot('coord_luz'); ok(!(bl.j.turmas||[]).some(t=>t.id==='t_tst_it
 const r404=await U.coord_luz.s.api('GET','turmas/t_tst_itb/historico',undefined,U.coord_luz.n); ok(r404.status===404||r404.status===403,'coord_luz bloqueado no histórico de outra unidade ('+r404.status+')')
 const cons=await U.consulta.s.api('POST','turmas',{turma:{id:'x',cursoId:'c',unidadeId:'u_itb',nome:'x'}},U.consulta.n); ok(cons.status===403,'consulta não cria turma ('+cons.status+')')
 // fluxo
-const cursoId=turmas[0].cursoId; const ID='t_fluxo_'+Date.now()
+const cursoId=b.j?.catalogo?.cursos?.[0]?.id; ok(!!cursoId, 'catálogo contém curso inicial para testar criação'); if (!cursoId) throw new Error('Pré-condição E2E: catálogo de cursos vazio'); const ID='t_fluxo_'+Date.now()
 let cr=await U.admin.s.api('POST','turmas',{turma:{id:ID,cursoId,unidadeId:'u_itb',nome:'Turma Fluxo',inicio:'2026-05-04',obs:'',evento:'',monitorId:'',tutorId:'',coordId:'',profId:'',ambiente:'',itens:{}}},U.admin.n)
 ok(cr.status===200||cr.status===201,'admin cria turma ('+cr.status+') status '+cr.j?.status); let t=cr.j
 const A=async(u,acao,extra={})=>{ const r=await U[u].s.api('POST',`turmas/${ID}/acao`,{acao,rev:t.rev,...extra},U[u].n); if(r.status===200) t=r.j; return r }
@@ -40,13 +75,106 @@ ok((await A('admin','reabrir')).status>=400,'reabrir exige motivo')
 ok((await A('admin','reabrir',{motivo:'Mudança de calendário'})).status===200 && t.status==='validacao' && t.versao===2,'reabrir → validacao v'+t.versao)
 const h=await U.coord_itb.s.api('GET',`turmas/${ID}/historico`,undefined,U.coord_itb.n); ok(h.status===200,'unidade lê histórico ('+h.status+')')
 const old=await U.admin.s.api('POST',`turmas/${ID}`,{turma:{...t,ambiente:'Y'},rev:t.rev-1},U.admin.n); ok(old.status===409,'conflito de revisão → 409 ('+old.status+')')
-const at=await U.coord_itb.s.api('GET','atividade',undefined,U.coord_itb.n); ok(at.status===200&&Array.isArray(at.j.atividade)&&at.j.atividade.length>0&&at.j.atividade.every(x=>x.turmaId===ID||true),'atividade recente (unidade) ('+at.status+', '+(at.j.atividade||[]).length+' itens)')
+const at=await U.coord_itb.s.api('GET','atividade',undefined,U.coord_itb.n); ok(at.status===200&&Array.isArray(at.j.atividade)&&at.j.atividade.length>0&&at.j.atividade.every(x=>x.turmaId===ID || (bi.j.turmas||[]).some(t=>t.id===x.turmaId)),'atividade recente (unidade) ('+at.status+', '+(at.j.atividade||[]).length+' itens)')
 const atL=await U.coord_luz.s.api('GET','atividade',undefined,U.coord_luz.n); ok(atL.status===200&&!(atL.j.atividade||[]).some(x=>x.turmaId===ID),'atividade não vaza turmas de outra unidade')
 const atA=await U.admin.s.api('GET','atividade',undefined,U.admin.n); ok(atA.status===200&&atA.j.atividade.some(x=>x.turmaId===ID),'equipe vê atividade de todas as turmas')
 { const bt=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n); const cat=bt.j.catalogo; const orig=cat.cursos[0].modalidade; cat.cursos[0].modalidade='semipresencial'; cat.cursos[0].categoria='qualificacao'
   const sv=await U.admin.s.api('POST','catalogo',{data:cat,rev:bt.j.crev},U.admin.n); ok(sv.status===200,'salva catálogo com modalidade ('+sv.status+')')
   const b2=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n); ok(b2.j.catalogo.cursos[0].modalidade==='semipresencial'&&b2.j.catalogo.cursos[0].categoria==='qualificacao','modalidade do curso persistiu')
   const b3=await U.coord_itb.s.api('GET','bootstrap',undefined,U.coord_itb.n); ok(b3.j.catalogo.cursos.every(c=>c.modalidade!==undefined&&c.categoria!==undefined),'unidade também recebe a modalidade') }
-const ex=await U.admin.s.api('GET','exportar',undefined,U.admin.n); ok(ex.status===200&&ex.j.turmas.length>=2,'backup exporta')
+// Concorrência real de requisições REST sobre a mesma revisão do catálogo.
+{
+  const initial = await boot('admin')
+  ok(initial.status===200, 'bootstrap para teste concorrente de catálogo')
+  if (initial.status===200) {
+    const rev = initial.j.crev
+    const payload1 = structuredClone(initial.j.catalogo)
+    const payload2 = structuredClone(initial.j.catalogo)
+    payload1.cursos[0].nota = 'Concorrrencia teste A'
+    payload2.cursos[0].nota = 'Concorrrencia teste B'
+    const [r1, r2] = await Promise.all([
+      U.admin.s.api('POST','catalogo',{data:payload1,rev},U.admin.n),
+      U.admin.s.api('POST','catalogo',{data:payload2,rev},U.admin.n),
+    ])
+    const aceitas = [r1,r2].filter(r => r.status===200)
+    const rejeitadas = [r1,r2].filter(r => r.status===409 || r.status===503)
+    ok(aceitas.length===1 && rejeitadas.length===1,
+      'gravação simultânea: somente uma aceita e outra recebe conflito/bloqueio ('+r1.status+', '+r2.status+')')
+    const after = await boot('admin')
+    const vencedora = r1.status===200 ? payload1.cursos[0].nota : payload2.cursos[0].nota
+    ok(after.status===200 && after.j.crev===rev+1 && after.j.catalogo.cursos[0].nota===vencedora,
+      'concorrência: catálogo final e revisão refletem somente a escrita aceita')
+  }
+}
+const ex=await U.admin.s.api('GET','exportar',undefined,U.admin.n); ok(ex.status===200 && Array.isArray(ex.j?.turmas) && ex.j.turmas.length>=1, 'backup exporta ('+ex.status+', '+(ex.j?.turmas?.length ?? 'sem lista')+' turmas; código '+(ex.j?.code ?? 'ok')+')')
+ok(ex.j?.schemaVersion===4&&ex.j?.backupMode==='full-state'&&typeof ex.j?.checksum==='string','backup usa formato completo v4')
+// Backup adulterado não deve passar nem pela simulação, preservando todo o estado.
+{
+  const snapshot = await boot('admin')
+  const badBackup = structuredClone(ex.j)
+  badBackup.catalogo.cursos[0].nome = 'Conteúdo adulterado no backup'
+  const bad = await U.admin.s.api('POST','importar',{...badBackup,simular:true},U.admin.n)
+  ok(bad.status===422 && bad.j?.code?.includes('checksum'),
+    'backup: checksum detecta modificação de conteúdo (422)')
+  const unchanged = await boot('admin')
+  ok(unchanged.status===200 && unchanged.j.crev===snapshot.j.crev &&
+    JSON.stringify(unchanged.j.catalogo)===JSON.stringify(snapshot.j.catalogo) &&
+    JSON.stringify(unchanged.j.turmas)===JSON.stringify(snapshot.j.turmas),
+    'backup adulterado não altera catálogo, revisão ou turmas')
+}
 const exu=await U.coord_itb.s.api('GET','exportar',undefined,U.coord_itb.n); ok(exu.status===403,'unidade não exporta backup ('+exu.status+')')
+
+// restauração completa: cria um dado depois do backup, simula e volta exatamente ao estado salvo
+const EXTRA='t_pos_backup_'+Date.now()
+const extra=await U.admin.s.api('POST','turmas',{turma:{id:EXTRA,cursoId,unidadeId:'u_itb',nome:'Criada depois do backup',inicio:'2026-08-03',obs:'',evento:'',monitorId:'',tutorId:'',coordId:'',profId:'',ambiente:'',itens:{}}},U.admin.n)
+ok(extra.status===200||extra.status===201,'cria turma depois do backup ('+extra.status+')')
+const beforeRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+const sim=await U.admin.s.api('POST','importar',{...ex.j,simular:true},U.admin.n)
+if(sim.status!==200) console.log('erro simulação backup:',JSON.stringify(sim.j))
+ok(sim.status===200&&sim.j?.simulacao===true&&typeof sim.j?.confirmacao==='string','simula restauração completa ('+sim.status+')')
+// Confirmação inválida deve impedir restauração sem mutar o estado.
+const beforeInvalid = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+const denied = await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev,confirmacao:'token-invalido',simular:false},U.admin.n)
+ok(denied.status===409,'backup: restauração sem confirmação válida bloqueada (409)')
+const afterInvalid = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+ok(afterInvalid.status===200 &&
+  afterInvalid.j.crev===beforeInvalid.j.crev &&
+  JSON.stringify(afterInvalid.j.catalogo)===JSON.stringify(beforeInvalid.j.catalogo) &&
+  JSON.stringify(afterInvalid.j.turmas)===JSON.stringify(beforeInvalid.j.turmas),
+  'backup: confirmação inválida preserva catálogo, revisão e turmas')
+// Uma restauração completa não deve aceitar revisão anterior à atual.
+const beforeStale = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+const staleRev = await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev-1,confirmacao:sim.j.confirmacao,simular:false},U.admin.n)
+ok(staleRev.status===409,'backup: revisão obsoleta rejeitada mesmo em full-state (409)')
+const afterStale = await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+ok(afterStale.status===200 &&
+  afterStale.j.crev===beforeStale.j.crev &&
+  JSON.stringify(afterStale.j.catalogo)===JSON.stringify(beforeStale.j.catalogo) &&
+  JSON.stringify(afterStale.j.turmas)===JSON.stringify(beforeStale.j.turmas),
+  'backup: revisão obsoleta não altera catálogo, revisão ou turmas')
+const restored=await U.admin.s.api('POST','importar',{...ex.j,rev:beforeRestore.j.crev,confirmacao:sim.j.confirmacao,simular:false},U.admin.n)
+ok(restored.status===200,'restauração completa executa ('+restored.status+')')
+const afterRestore=await U.admin.s.api('GET','bootstrap',undefined,U.admin.n)
+ok(!(afterRestore.j?.turmas||[]).some(x=>x.id===EXTRA),'restauração remove turma criada após o backup')
+const restoredFlow=(afterRestore.j?.turmas||[]).find(x=>x.id===ID)
+const backedFlow=(ex.j?.turmas||[]).find(x=>x.id===ID)
+ok(!!restoredFlow&&!!backedFlow&&restoredFlow.status===backedFlow.status&&restoredFlow.versao===backedFlow.versao,'restauração preserva status e versão da turma')
+ok(!!restoredFlow && !!backedFlow && restoredFlow.rev===backedFlow.rev &&
+  restoredFlow.unidadeId===backedFlow.unidadeId &&
+  restoredFlow.cursoId===backedFlow.cursoId,
+  'restauração preserva revisão, unidade e curso da turma')
+ok(afterRestore.j.crev===beforeRestore.j.crev+1,
+  'restauração avança exatamente uma revisão do catálogo')
+
+if (backedFlow?.vigente?.versao) {
+  const v = await U.admin.s.api('GET',`turmas/${ID}/versoes/${backedFlow.vigente.versao}`,undefined,U.admin.n)
+  ok(v.status===200 &&
+    v.j?.versao===backedFlow.vigente.versao &&
+    v.j?.snapshot?.turma?.id===ID &&
+    v.j?.snapshot?.curso?.id===backedFlow.cursoId &&
+    v.j?.snapshot?.unidade?.id===backedFlow.unidadeId,
+    'restauração preserva snapshot da versão vigente e referências ('+v.status+')')
+}
+
 console.log(fails?`\n${fails} FALHA(S)`:'\nTUDO OK')
+if (fails) process.exitCode = 1

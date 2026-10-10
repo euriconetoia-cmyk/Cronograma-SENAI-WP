@@ -4,6 +4,8 @@ import {
   diasEstudoItem,
   quantidadeEventosItem,
   diasPermitidosEvento,
+  aplicarConfiguracaoTurma,
+  validarConfiguracaoModelo,
 } from '../ui/src/lib/scheduleProfiles.ts'
 
 const item = (patch = {}) => ({ id: 'i1', tipo: 'uc', nome: 'UC', ch: 30, pres: 6, div: 3, ...patch })
@@ -52,4 +54,37 @@ const curso = (patch = {}) => ({
   assert.deepEqual(diasPermitidosEvento(item(), c, 'presencial'), [6], 'lista vazia usa default seguro')
 }
 
-console.log('schedule profiles: 6 cenários aprovados')
+{
+  const base = curso({ modeloCronograma: 'aprendizagem', configuracaoCronograma: { aprendizagem: { faseIntensivaDiasUteis: 23, diasAtendimentoRegular: [1,2] } } })
+  const efetivo = aplicarConfiguracaoTurma(base, { personalizarCronograma: true, configuracaoCronograma: { aprendizagem: { faseIntensivaDiasUteis: 10, diasAtendimentoRegular: [3] } } })
+  const p = resolverPerfilCronograma(efetivo)
+  assert.equal(p.aprendizagem?.faseIntensivaDiasUteis, 10, 'turma deve sobrescrever somente a fase intensiva')
+  assert.deepEqual(p.aprendizagem?.diasAtendimentoRegular, [3], 'turma deve sobrescrever dias semanais')
+  assert.deepEqual(p.aprendizagem?.diasIntensivos, [1,2,3,4,5], 'campos não sobrescritos devem continuar herdados do preset')
+}
+
+{
+  const base = curso({ modeloCronograma: 'distribuicao_diaria', configuracaoCronograma: { cargaDiaria: 4 } })
+  const efetivo = aplicarConfiguracaoTurma(base, { personalizarCronograma: false, configuracaoCronograma: { cargaDiaria: 6 } })
+  assert.equal(resolverPerfilCronograma(efetivo).cargaDiaria, 4, 'override desligado não deve alterar o curso')
+}
+
+{
+  const c = curso({ modeloCronograma: 'aprendizagem', configuracaoCronograma: { aprendizagem: { faseIntensivaDiasUteis: 23, diasAtendimentoRegular: [] } } })
+  assert.equal(validarConfiguracaoModelo(c).length, 0, 'lista vazia explícita usa fallback seguro do perfil')
+}
+
+
+for (const modelo of ['tecnico','qualificacao','distribuicao_diaria','aprendizagem','personalizado']) {
+  const base = curso({modeloCronograma:modelo})
+  const antes = diasPermitidosEvento(item(),base,'presencial')
+  const efetivo = aplicarConfiguracaoTurma(base,{personalizarCronograma:true,configuracaoCronograma:{
+    presencial:{diasPermitidos:[2,4]},sincrono:{diasPermitidos:[1,3]},diasEstudoPermitidos:[1,2,3,4]
+  }})
+  assert.deepEqual(diasPermitidosEvento(item(),efetivo,'presencial'),[2,4],modelo+' deve permitir terça e quinta presenciais na turma')
+  assert.deepEqual(diasPermitidosEvento(item(),efetivo,'sincrono'),[1,3],modelo+' deve permitir dias síncronos específicos')
+  assert.deepEqual(resolverPerfilCronograma(efetivo).diasEstudoPermitidos,[1,2,3,4])
+  assert.deepEqual(diasPermitidosEvento(item(),base,'presencial'),antes,modelo+' não pode alterar o curso original')
+}
+
+console.log('schedule profiles: 9 cenários + personalização semanal dos cinco modelos aprovados')

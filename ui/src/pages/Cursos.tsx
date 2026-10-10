@@ -6,7 +6,7 @@ import { Confirm, Field, Panel, uid, type ConfirmCopy } from '@/components/Field
 import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
 import type { Curso, Item, ModeloCronograma, Tipo } from '@/lib/types'
-import { diasEstudoItem, resolverPerfilCronograma } from '@/lib/scheduleProfiles'
+import { diasEstudoItem, MODELO_LABEL, resolverPerfilCronograma, validarConfiguracaoModelo } from '@/lib/scheduleProfiles'
 
 const TIPOS: [Tipo, string][] = [['intro', 'Introdutório'], ['uc', 'UC'], ['rec', 'Recuperação'], ['mat', 'Matrícula'], ['pratica', 'Prática profissional']]
 const ROW: Record<Tipo, string> = { intro: 'bg-row-intro', uc: 'bg-card', rec: 'bg-row-rec', mat: 'bg-row-intro', pratica: 'bg-row-intro' }
@@ -19,12 +19,13 @@ const alternarDia = (dias: number[], dia: number) => dias.includes(dia) ? dias.f
 export function CursosPage() {
   const { d, update, cursoId, setCursoId } = useStore()
   const [detalhe, setDetalhe] = useState(false) // no celular: lista ou detalhe
+  const [avancado, setAvancado] = useState(false)
   const [confirma, setConfirma] = useState<{ copy: ConfirmCopy; run: () => void } | null>(null)
   const c = d.cursos.find(x => x.id === cursoId) || d.cursos[0]
   const mut = (fn: (c: Curso) => void) => update(x => { fn(x.cursos.find(a => a.id === c.id)!) })
 
   const novo = () => {
-    const n: Curso = { id: uid('c'), nome: 'Novo curso', categoria: '', modalidade: '', modeloCronograma: 'qualificacao', chTotal: 0, nota: '', regras: { hEncontro: 8, webDias: 10, webHora: '15h', postDias: 3, horario: '08:00h às 17:00h' }, modulos: [{ id: uid('m'), nome: 'Módulo 1', itens: [] }] }
+    const n: Curso = { id: uid('c'), nome: 'Novo curso', categoria: '', modalidade: 'ead', modeloCronograma: 'qualificacao', chTotal: 0, nota: '', regras: { hEncontro: 8, webDias: 10, webHora: '15h', postDias: 3, horario: '08:00h às 17:00h' }, modulos: [{ id: uid('m'), nome: 'Módulo 1', itens: [{ ...novoItem('intro'), nome: 'Ambientação', ch: 0, pres: 0, div: 0 }] }] }
     update(x => { x.cursos.push(n) }); setCursoId(n.id)
   }
   const duplicar = () => { const n: Curso = JSON.parse(JSON.stringify(c)); n.id = uid('c'); n.nome = `${c.nome} (cópia)`; n.modulos.forEach(m => { m.id = uid('m'); m.itens.forEach(i => { i.id = uid('i') }) }); update(x => { x.cursos.push(n) }); setCursoId(n.id); toast('Curso duplicado.') }
@@ -37,14 +38,31 @@ export function CursosPage() {
   if (!c) return <Panel><p className="text-sm text-muted-foreground">Nenhum curso cadastrado.</p><Button className="mt-3" onClick={novo}>{T.cursos.novo}</Button></Panel>
   const soma = c.modulos.reduce((s, m) => s + m.itens.filter(i => i.tipo === 'uc' || i.tipo === 'pratica').reduce((a, i) => a + (+i.ch || 0), 0), 0)
   const chOk = soma === +c.chTotal
+  const perfil = resolverPerfilCronograma(c)
+  const errosModelo = validarConfiguracaoModelo(c)
 
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
-      <Panel className={detalhe ? 'max-md:hidden' : ''} title={T.cursos.titulo} actions={<Button size="sm" onClick={novo}><Plus size={14} />{T.cursos.novo}</Button>}>
+      <Panel className={detalhe ? 'max-md:hidden' : ''} title={T.cursos.titulo} actions={<div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => {
+          const faltantes = d.cursos.filter(c => !c.modulos.some(m => m.itens.some(i => i.tipo === 'intro' && i.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação')))
+          if (!faltantes.length) { toast('Todos os cursos já possuem Ambientação.'); return }
+          if (!window.confirm(`Adicionar Ambientação sem carga horária a ${faltantes.length} curso(s), sem alterar a CH existente?`)) return
+          update(x => {
+            for (const curso of x.cursos) {
+              if (curso.modulos.some(m => m.itens.some(i => i.tipo === 'intro' && i.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) continue
+              if (!curso.modulos.length) curso.modulos.push({ id: uid('m'), nome: 'Módulo 1', itens: [] })
+              curso.modulos[0].itens.unshift({ ...novoItem('intro'), nome: 'Ambientação', ch: 0, pres: 0, div: 0 })
+            }
+          })
+          toast('Ambientação incluída nos cursos que ainda não a possuíam.')
+        }}>Regularizar Ambientação</Button>
+        <Button size="sm" onClick={novo}><Plus size={14} />{T.cursos.novo}</Button>
+      </div>}>
         <ul className="flex flex-col gap-1.5">
           {d.cursos.map(x => {
             const n = x.modulos.reduce((s, m) => s + m.itens.filter(i => i.tipo === 'uc').length, 0)
-            return <li key={x.id}><button onClick={() => { setCursoId(x.id); setDetalhe(true) }} aria-current={x.id === c.id} className={`min-h-[56px] w-full rounded-lg border px-3 py-2 text-left ${x.id === c.id ? 'border-primary bg-accent' : 'bg-card hover:border-primary'}`}><span className="block font-medium">{x.nome}</span><span className="text-xs text-muted-foreground">{[x.categoria && T.categoria[x.categoria]?.nome, x.modalidade && T.modalidade[x.modalidade]].filter(Boolean).join(' · ')}{x.categoria || x.modalidade ? ' · ' : ''}{n} UCs · {x.chTotal} h</span></button></li>
+            return <li key={x.id}><button onClick={() => { setCursoId(x.id); setDetalhe(true) }} aria-current={x.id === c.id} className={`min-h-[56px] w-full rounded-lg border px-3 py-2 text-left ${x.id === c.id ? 'border-primary bg-accent' : 'bg-card hover:border-primary'}`}><span className="flex items-center justify-between gap-2"><span className="block min-w-0 truncate font-medium">{x.nome}</span><span className="shrink-0 rounded-full border border-primary/30 bg-accent px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">{MODELO_LABEL[x.modeloCronograma || 'qualificacao']}</span></span><span className="text-xs text-muted-foreground">{[x.categoria && T.categoria[x.categoria]?.nome, x.modalidade && T.modalidade[x.modalidade]].filter(Boolean).join(' · ')}{x.categoria || x.modalidade ? ' · ' : ''}{n} UCs · {x.chTotal} h</span></button></li>
           })}
         </ul>
       </Panel>
@@ -62,7 +80,6 @@ export function CursosPage() {
               {T.categoriaGrupos.map(g => <optgroup key={g.nome} label={g.nome}>{g.itens.map(k => <option key={k} value={k}>{T.categoria[k].nome}</option>)}</optgroup>)}
             </select></Field>
             <Field label="Modalidade (como é oferecido)"><select className="field-input" value={c.modalidade ?? ''} onChange={e => mut(k => { k.modalidade = e.target.value as Curso['modalidade'] })}>
-              <option value="">Não informada</option>
               {Object.entries(T.modalidadeLonga).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select></Field>
             <Field label="Modelo do cronograma"><select className="field-input" value={c.modeloCronograma ?? 'qualificacao'} onChange={e => mut(k => { k.modeloCronograma = e.target.value as ModeloCronograma })}>
@@ -79,13 +96,19 @@ export function CursosPage() {
           <div className={`mt-3 rounded-md px-3 py-2 text-sm ${chOk ? 'bg-ok-soft text-ok' : 'bg-bad-soft text-destructive'}`}>{chOk ? T.cursos.chOk(soma, +c.chTotal) : T.cursos.chErro(soma, +c.chTotal)}</div>
         </Panel>
 
-        <Panel title={T.cursos.regras}>
+        <Panel title={T.cursos.regras} actions={<label className="flex items-center gap-2 text-xs font-medium"><input type="checkbox" checked={avancado} onChange={e => setAvancado(e.target.checked)} />Mostrar configurações avançadas</label>}>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-primary/30 bg-accent px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-primary">{MODELO_LABEL[c.modeloCronograma || 'qualificacao']}</span>
+            <span className="text-sm text-muted-foreground">Somente regras compatíveis com este modelo são exibidas por padrão.</span>
+          </div>
           <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2 xl:grid-cols-3">
-            <Field label="Horas por encontro presencial"><input type="number" min={1} className="field-input mono" value={c.regras.hEncontro} onChange={e => mut(k => { k.regras.hEncontro = +e.target.value })} /></Field>
-            <Field label="Horário padrão dos encontros"><input className="field-input" value={c.regras.horario} onChange={e => mut(k => { k.regras.horario = e.target.value })} /></Field>
-            <Field label="Webconferência: dias antes do encontro"><input type="number" min={0} className="field-input mono" value={c.regras.webDias} onChange={e => mut(k => { k.regras.webDias = +e.target.value })} /></Field>
-            <Field label="Webconferência: hora"><input className="field-input" value={c.regras.webHora} onChange={e => mut(k => { k.regras.webHora = e.target.value })} /></Field>
-            <Field label="Postagem de notas: dias úteis depois"><input type="number" min={0} className="field-input mono" value={c.regras.postDias} onChange={e => mut(k => { k.regras.postDias = +e.target.value })} /></Field>
+            {(c.modeloCronograma === 'tecnico' || c.modeloCronograma === 'qualificacao' || c.modeloCronograma === 'personalizado' || avancado) && <>
+              <Field label="Horas por encontro presencial"><input type="number" min={1} className="field-input mono" value={c.regras.hEncontro} onChange={e => mut(k => { k.regras.hEncontro = +e.target.value })} /></Field>
+              <Field label="Horário padrão dos encontros"><input className="field-input" value={c.regras.horario} onChange={e => mut(k => { k.regras.horario = e.target.value })} /></Field>
+              <Field label="Webconferência: dias antes do encontro"><input type="number" min={0} className="field-input mono" value={c.regras.webDias} onChange={e => mut(k => { k.regras.webDias = +e.target.value })} /></Field>
+              <Field label="Webconferência: hora"><input className="field-input" value={c.regras.webHora} onChange={e => mut(k => { k.regras.webHora = e.target.value })} /></Field>
+              <Field label="Postagem de notas: dias úteis depois"><input type="number" min={0} className="field-input mono" value={c.regras.postDias} onChange={e => mut(k => { k.regras.postDias = +e.target.value })} /></Field>
+            </>}
             {(c.modeloCronograma === 'distribuicao_diaria' || c.modeloCronograma === 'personalizado') && <Field label="Carga diária para distribuição (h)"><input type="number" min={0.5} step={0.5} className="field-input mono" value={c.configuracaoCronograma?.cargaDiaria ?? 3} onChange={e => mut(k => { k.configuracaoCronograma = { ...(k.configuracaoCronograma || {}), cargaDiaria: +e.target.value } })} /></Field>}
             {c.modeloCronograma === 'aprendizagem' && <>
               <Field label="Fase intensiva: dias úteis de atendimento"><input type="number" min={0} className="field-input mono" value={c.configuracaoCronograma?.aprendizagem?.faseIntensivaDiasUteis ?? 23} onChange={e => mut(k => { k.configuracaoCronograma = { ...(k.configuracaoCronograma || {}), aprendizagem: { ...(k.configuracaoCronograma?.aprendizagem || {}), faseIntensivaDiasUteis: Math.max(0, +e.target.value) } } })} /></Field>
@@ -99,6 +122,21 @@ export function CursosPage() {
               <Field label="Dias permitidos para síncrono (0=dom ... 6=sáb)"><input className="field-input mono" value={(c.configuracaoCronograma?.sincrono?.diasPermitidos ?? [1,2,3,4,5]).join(',')} onChange={e => mut(k => { k.configuracaoCronograma = { ...(k.configuracaoCronograma || {}), sincrono: { ...(k.configuracaoCronograma?.sincrono || {}), ativo: true, modo: 'quantidade', diasPermitidos: parseDias(e.target.value) } } })} /></Field>
             </>}
           </div>
+          <div className="mt-4 rounded-lg border bg-secondary/40 p-3 text-sm">
+            <div className="mb-1 font-semibold">Resumo das regras</div>
+            <div className="grid gap-1 sm:grid-cols-2">
+              <span><b>Modelo:</b> {MODELO_LABEL[perfil.modelo]}</span>
+              <span><b>Dias de estudo:</b> {perfil.diasEstudoPermitidos.join(', ')}</span>
+              {perfil.modelo === 'distribuicao_diaria' && <span><b>Carga diária:</b> {perfil.cargaDiaria} h</span>}
+              {perfil.modelo === 'aprendizagem' && perfil.aprendizagem && <>
+                <span><b>Fase intensiva:</b> {perfil.aprendizagem.faseIntensivaDiasUteis} dias úteis</span>
+                <span><b>Atendimento semanal:</b> dias {perfil.aprendizagem.diasAtendimentoRegular.join(', ')}</span>
+                <span><b>Webaula:</b> {perfil.aprendizagem.horarioWebaula || 'horário não informado'}</span>
+              </>}
+              {(perfil.modelo === 'tecnico' || perfil.modelo === 'qualificacao') && <span><b>Presencial:</b> {perfil.presencial.ativo ? `${perfil.presencial.modo} · dias ${perfil.presencial.diasPermitidos.join(', ')}` : 'desativado'}</span>}
+            </div>
+            {errosModelo.length > 0 && <div className="mt-2 rounded-md bg-bad-soft px-3 py-2 text-destructive"><b>Corrija antes de homologar:</b><ul className="ml-5 list-disc">{errosModelo.map(e => <li key={e}>{e}</li>)}</ul></div>}
+          </div>
           <p className="mt-3 max-w-prose text-xs leading-relaxed text-muted-foreground">Perfil ativo: <b>{MODELOS.find(x => x[0] === (c.modeloCronograma ?? 'qualificacao'))?.[1]}</b>. {c.modeloCronograma === 'aprendizagem' ? 'As webaulas são calculadas por duas fases: atendimento diário no período intensivo e, depois, nos dias semanais selecionados.' : c.modeloCronograma === 'distribuicao_diaria' ? 'Os dias de estudo são calculados pela carga diária configurada.' : 'O comportamento atual de EaD e encontros presenciais é preservado.'}</p>
         </Panel>
 
@@ -107,6 +145,7 @@ export function CursosPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 bg-row-mod px-3 py-2">
               <input aria-label="Nome do módulo" className="cell-input max-w-xs font-heading text-[15px] font-semibold" value={m.nome} onChange={e => mut(k => { k.modulos[mi].nome = e.target.value })} />
               <div className="flex flex-wrap items-center gap-1.5">
+                {!c.modulos.some(mod => mod.itens.some(item => item.tipo === 'intro' && item.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação')) && <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.unshift({ ...novoItem('intro'), nome: 'Ambientação', ch: 0, pres: 0, div: 0 }) })}><Plus size={13} />Ambientação (fora da CH)</Button>}
                 <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.push(novoItem('uc')) })}><Plus size={13} />{T.cursos.addUC}</Button>
                 <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.push(novoItem('rec')) })}><Plus size={13} />{T.cursos.addRec}</Button>
                 <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.push(novoItem('mat')) })}><Plus size={13} />{T.cursos.addMat}</Button>
@@ -128,7 +167,7 @@ export function CursosPage() {
                       <Field label="Tipo"><select className="field-input min-h-[44px]" value={it.tipo} onChange={e => setIt({ tipo: e.target.value as Tipo })}>{TIPOS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></Field>
                       <Field label="Nome"><input className="field-input min-h-[44px] font-medium" value={it.nome} onChange={e => setIt({ nome: e.target.value })} /></Field>
                       <div className="grid grid-cols-2 gap-2.5">
-                        <Field label="CH total"><input type="number" min={0} inputMode="numeric" className={num} value={it.ch} onChange={e => setIt({ ch: +e.target.value })} /></Field>
+                        <Field label="CH total"><input type="number" min={0} inputMode="numeric" className={num} disabled={it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'} value={it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação' ? 0 : it.ch} onChange={e => setIt({ ch: +e.target.value })} /></Field>
                         <Field label="CH presencial"><input type="number" min={0} inputMode="numeric" className={num} value={it.pres} onChange={e => setIt({ pres: +e.target.value })} /></Field>
                         <Field label="Divisor"><input type="number" min={0.5} step={0.5} inputMode="decimal" className={num} value={it.div} onChange={e => setIt({ div: +e.target.value })} /></Field>
                         {c.modeloCronograma === 'aprendizagem' && it.tipo === 'uc' ? <div className="flex flex-col justify-end text-sm"><span className="kicker">Webaulas</span><span className="min-h-[44px] pt-2.5 text-muted-foreground">Calculadas pela regra de atendimento</span></div> : resolverPerfilCronograma(c).sincrono.ativo && it.tipo === 'uc' ? <Field label="Momentos síncronos"><input type="number" min={0} inputMode="numeric" className={num} value={it.sincronos ?? 0} onChange={e => setIt({ sincronos: +e.target.value })} /></Field> : null}

@@ -11,6 +11,17 @@ class Cronograma_EAD_REST {
 		$id = array( 'id' => array( 'validate_callback' => array( 'Cronograma_EAD_Store', 'valid_id' ) ) );
 		register_rest_route( self::NS, '/bootstrap', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'bootstrap' ), 'permission_callback' => array( __CLASS__, 'can_view' ) ) );
 		register_rest_route( self::NS, '/catalogo', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'catalogo' ), 'permission_callback' => array( __CLASS__, 'can_manage_catalog' ) ) );
+		register_rest_route( self::NS, '/feriados/nacionais/(?P<ano>\d{4})', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'feriados_nacionais' ), 'permission_callback' => array( __CLASS__, 'can_manage_catalog' ) ) );
+		register_rest_route( self::NS, '/localidades/municipios/(?P<uf>[A-Za-z]{2})', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'municipios' ), 'permission_callback' => array( __CLASS__, 'can_manage_catalog' ) ) );
+		register_rest_route( self::NS, '/feriados/local/(?P<id>[A-Za-z0-9_\-]+)/(?P<ano>\d{4})', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'feriados_local' ), 'permission_callback' => array( __CLASS__, 'can_manage_catalog' ) ) );
+		register_rest_route(
+			self::NS,
+			'/feriados/config',
+			array(
+				array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'feriados_config' ), 'permission_callback' => array( __CLASS__, 'can_configure' ) ),
+				array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'feriados_config_salvar' ), 'permission_callback' => array( __CLASS__, 'can_configure' ) ),
+			)
+		);
 		register_rest_route( self::NS, '/turmas', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'criar' ), 'permission_callback' => array( __CLASS__, 'can_create_turma' ) ) );
 		register_rest_route( self::NS, '/turmas/(?P<id>[A-Za-z0-9_\-]+)', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'salvar' ), 'permission_callback' => array( __CLASS__, 'can_edit_turma' ), 'args' => $id ) );
 		register_rest_route( self::NS, '/turmas/(?P<id>[A-Za-z0-9_\-]+)/acao', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'acao' ), 'permission_callback' => array( __CLASS__, 'can_act_turma' ), 'args' => $id ) );
@@ -66,6 +77,11 @@ class Cronograma_EAD_REST {
 	public static function acesso_salvar( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Accounts::atualizar( (int) $r['uid'], (array) $r->get_json_params() ) ); }
 	public static function acesso_link( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Accounts::novo_link( (int) $r['uid'], (array) $r->get_json_params() ) ); }
 	public static function catalogo( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::salvar_catalogo( $r->get_json_params() ) ); }
+	public static function feriados_nacionais( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::feriados_nacionais( (int) $r['ano'] ) ); }
+	public static function municipios( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::municipios_uf( (string) $r['uf'] ) ); }
+	public static function feriados_local( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::feriados_local( (string) $r['id'], (int) $r['ano'] ) ); }
+	public static function feriados_config() { return self::out( Cronograma_EAD_Service::feriados_config() ); }
+	public static function feriados_config_salvar( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::feriados_config_salvar( (array) $r->get_json_params() ) ); }
 	public static function criar( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::criar( (array) $r->get_json_params() ) ); }
 	public static function salvar( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::salvar( $r['id'], (array) $r->get_json_params() ) ); }
 	public static function acao( WP_REST_Request $r ) { return self::out( Cronograma_EAD_Service::acao( $r['id'], (array) $r->get_json_params() ) ); }

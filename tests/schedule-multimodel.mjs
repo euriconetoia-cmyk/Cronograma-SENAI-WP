@@ -45,7 +45,7 @@ const cursoDiario = {
   const tt = { inicio:'2026-04-20', unidadeId:'u1', itens:{ i1:{ enc:[{d:'2026-04-22',h:'08h',w:'15h'}] } } }
   const g = compute(tt,c,[])
   assert.equal(g.rows[0].c.K,'2026-04-29','dias de estudo devem respeitar seg/qua/sex')
-  const fix = corrigirEncontros(tt,g,[],new Set(['i1:0']))
+  const fix = corrigirEncontros(tt,g,[],new Set(['presencial:i1:0']))
   assert.equal(fix.i1[0].d,'2026-04-21','correção deve respeitar terça-feira configurada para presencial')
 }
 

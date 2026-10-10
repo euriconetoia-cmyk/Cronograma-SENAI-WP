@@ -22,8 +22,8 @@ export const T = {
     pos_graduacao: { nome: 'Pós-graduação', desc: 'Especialização (lato sensu) para quem já tem curso superior.' },
     mestrado_doutorado: { nome: 'Mestrado e doutorado', desc: 'Pós-graduação stricto sensu (profissional ou acadêmica).' },
   } as unknown as Record<string, { nome: string; desc: string; min?: number; max?: number }>,
-  modalidade: { ead: 'EaD', semipresencial: 'Semipresencial', presencial: 'Presencial' } as Record<string, string>,
-  modalidadeLonga: { ead: 'EaD (a distância)', semipresencial: 'Semipresencial (parte presencial)', presencial: 'Presencial' } as Record<string, string>,
+  modalidade: { ead: 'EaD (100% Online)', semipresencial: 'Semipresencial / Híbrido' } as Record<string, string>,
+  modalidadeLonga: { ead: 'EaD (100% Online)', semipresencial: 'Semipresencial / Híbrido' } as Record<string, string>,
   inicio: {
     titulo: 'Início', subEquipe: 'Como estão os cronogramas e o que precisa da sua atenção.', subUnidade: 'Como estão as turmas da sua unidade e o que espera a sua validação.',
     status: 'Cronogramas por status', acao: 'Precisa de ação agora', acaoVazio: 'Nada pendente. Tudo em dia.', unidade: 'Por unidade', atividade: 'Atividade recente', atividadeVazio: 'Ainda sem atividade registrada.', marcos: 'Próximos marcos', marcosVazio: 'Nada marcado para os próximos 45 dias.',
@@ -36,6 +36,7 @@ export const T = {
       acessos: { nome: 'Acessos', desc: 'Quem entra no sistema e com qual perfil' },
       unidades: { nome: 'Unidades', desc: 'Unidades escolares atendidas' },
       feriados: { nome: 'Feriados', desc: 'Dias sem aula usados no cálculo das datas' },
+      integracoes: { nome: 'Integrações', desc: 'Serviços externos e credenciais técnicas' },
       backup: { nome: 'Backup', desc: 'Exportar e restaurar os dados' },
     },
   },

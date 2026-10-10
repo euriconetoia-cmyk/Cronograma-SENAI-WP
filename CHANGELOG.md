@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.21.0-rc1 — Interface orientada por modelo
+
+### Configurações e operação
+- Feriados nacionais brasileiros sincronizados automaticamente por ano, com cache e botão de atualização manual.
+- Backup atualizado para formato v4 de estado completo, com checksum, simulação e restauração transacional.
+- Cópia automática de segurança criada antes de qualquer restauração completa.
+- Cadastro de unidades passa a incluir Estado/UF, com validação das 27 UFs.
+- Modalidades oficiais simplificadas para "EaD (100% Online)" e "Semipresencial / Híbrido".
+- Dados legados com modalidade "Presencial" são compatibilizados como "Semipresencial / Híbrido".
+- Teste E2E cobre exportação, criação de dado posterior e restauração do estado salvo.
+
+- Interface de cursos orientada ao modelo de cronograma.
+- Badge visível para Técnico, Qualificação, Distribuição Diária, Aprendizagem e Personalizado.
+- Campos incompatíveis ocultos por padrão e modo de configurações avançadas.
+- Resumo das regras efetivas antes da matriz curricular.
+- Herança de regras curso → turma → UC.
+- Personalização opcional por turma sem alterar o curso-base.
+- Cronograma e cálculos usam a configuração efetiva da turma.
+- Backend valida e persiste somente sobrescritas conhecidas de cronograma da turma.
+- Novos testes de herança e regressão dos perfis.
+
+
 ## 2.20.0-rc1 - Schedule Engine Multimodelo
 
 ### Modelos de cronograma

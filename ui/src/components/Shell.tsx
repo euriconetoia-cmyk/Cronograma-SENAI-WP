@@ -41,6 +41,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const atual = emConfig ? 'config' : page
   return (
     <div className="min-h-screen">
+      <a href="#conteudo-principal" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-card focus:px-4 focus:py-2 focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary">Pular para o conteúdo principal</a>
       {api.mock && (
         <div className="bg-warn-soft px-4 py-1.5 text-xs text-warn">
           <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-3 gap-y-1">
@@ -70,7 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <MenuUsuario me={me} dark={dark} setDark={setDark} wp={wp} logout={logout} estado={estado} salvo={salvo} />
         </div>
       </header>
-      <main key={page} className="ce-pagina mx-auto max-w-[1500px] px-4 pb-28 pt-5 lg:pb-16">{children}</main>
+      <main id="conteudo-principal" tabIndex={-1} key={page} className="ce-pagina mx-auto max-w-[1500px] px-4 pb-28 pt-5 lg:pb-16">{children}</main>
       <BarraInferior entradas={entradas} atual={atual} count={count} validar={validar} go={go} page={page} />
     </div>
   )
@@ -102,10 +103,17 @@ function ItemTopo({ p, ativo, n, aviso, go }: { p: string; ativo: boolean; n?: n
 function MenuUsuario({ me, dark, setDark, wp, logout, estado, salvo }: { me: { nome: string; perfil: 'equipe' | 'unidade' | 'consulta'; validador?: boolean }; dark: boolean; setDark: (f: (v: boolean) => boolean) => void; wp: boolean; logout?: string; estado: string; salvo: string }) {
   const [aberto, setAberto] = useState(false)
   const ref = useFora(aberto, () => setAberto(false))
+  const gatilho = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!aberto) return
+    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') { setAberto(false); gatilho.current?.focus() } }
+    document.addEventListener('keydown', fechar)
+    return () => document.removeEventListener('keydown', fechar)
+  }, [aberto])
   const ini = (me.nome || '?').trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase()
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setAberto(v => !v)} aria-haspopup="menu" aria-expanded={aberto} aria-label={`Conta de ${me.nome}`}
+      <button ref={gatilho} type="button" onClick={() => setAberto(v => !v)} aria-haspopup="menu" aria-expanded={aberto} aria-label={`Conta de ${me.nome}`}
         className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-primary">
         <span className="grid h-8 w-8 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{ini}</span>
         <span className="hidden text-left text-xs leading-tight md:block"><span className="block font-semibold">{me.nome}</span><span className="block text-muted-foreground">{T.perfil[me.perfil]}{me.perfil === 'unidade' && me.validador ? ' · valida' : ''}</span></span>
@@ -126,6 +134,13 @@ function MenuUsuario({ me, dark, setDark, wp, logout, estado, salvo }: { me: { n
 function BarraInferior({ entradas, atual, count, validar, go, page }: { entradas: string[]; atual: string; count: Partial<Record<string, number>>; validar: number; go: (p: Page) => void; page: string }) {
   const [mais, setMais] = useState(false)
   const ref = useFora(mais, () => setMais(false))
+  const gatilhoMais = useRef<HTMLButtonElement>(null)
+  useEffect(() => {
+    if (!mais) return
+    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMais(false); gatilhoMais.current?.focus() } }
+    document.addEventListener('keydown', fechar)
+    return () => document.removeEventListener('keydown', fechar)
+  }, [mais])
   if (CONFIG_PAGES.includes(page as Page)) ultimaConfig = page as Page
   const cabem = entradas.length <= 5
   const fixos = cabem ? entradas : entradas.slice(0, 4), resto = cabem ? [] : entradas.slice(4)
@@ -133,7 +148,7 @@ function BarraInferior({ entradas, atual, count, validar, go, page }: { entradas
   const Item = ({ p, ativo, onClick, rotulo, n, aviso }: { p: string; ativo: boolean; onClick: () => void; rotulo: string; n?: number; aviso?: boolean }) => {
     const Ic = p === 'mais' ? Ellipsis : ICONES[p] ?? CalendarDays
     return (
-      <button type="button" onClick={onClick} aria-current={ativo ? 'page' : undefined} aria-expanded={p === 'mais' ? mais : undefined} data-ativo={ativo || undefined}
+      <button ref={p === 'mais' ? gatilhoMais : undefined} type="button" onClick={onClick} aria-current={ativo ? 'page' : undefined} aria-expanded={p === 'mais' ? mais : undefined} data-ativo={ativo || undefined}
         aria-label={rotulo} title={rotulo}
         className={`ce-menu-item relative flex min-h-[52px] min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary ${ativo ? 'ce-m-ativo bg-primary/10 text-primary' : 'ce-m-quieto text-muted-foreground'}`}>
         <span className="ce-menu-icone relative"><Ic size={22} strokeWidth={ativo ? 2.2 : 1.7} />
@@ -144,7 +159,7 @@ function BarraInferior({ entradas, atual, count, validar, go, page }: { entradas
     )
   }
   return (
-    <div ref={ref} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 lg:hidden">
+    <div ref={ref} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
       {mais && (
         <div role="menu" className="ce-pop mb-2 ml-auto w-56 rounded-xl border bg-card p-1.5 shadow-xl">
           {resto.map(p => { const Ic = ICONES[p] ?? CalendarDays; return (
