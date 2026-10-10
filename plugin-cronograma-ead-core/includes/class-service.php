@@ -876,7 +876,12 @@ class Cronograma_EAD_Service {
 			$resm = wp_safe_remote_get( $url_mun, array( 'timeout' => 12, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json', 'X-API-Key' => $api_key ) ) );
 			if ( ! is_wp_error( $resm ) && 200 === (int) wp_remote_retrieve_response_code( $resm ) ) {
 				$bodym = json_decode( wp_remote_retrieve_body( $resm ), true );
-				$lista_municipal = is_array( $bodym ) && isset( $bodym['feriados'] ) && is_array( $bodym['feriados'] ) ? $bodym['feriados'] : ( is_array( $bodym ) ? $bodym : array() );
+				if ( ! is_array( $bodym ) || ( isset( $bodym['feriados'] ) && ! is_array( $bodym['feriados'] ) ) ) {
+					$avisos[] = 'A fonte municipal retornou dados inválidos.';
+					$lista_municipal = array();
+				} else {
+					$lista_municipal = isset( $bodym['feriados'] ) ? $bodym['feriados'] : $bodym;
+				}
 				foreach ( $lista_municipal as $item ) {
 					if ( ! is_array( $item ) ) continue;
 					$raw = isset( $item['data'] ) ? sanitize_text_field( (string) $item['data'] ) : '';
