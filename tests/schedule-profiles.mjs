@@ -74,4 +74,17 @@ const curso = (patch = {}) => ({
   assert.equal(validarConfiguracaoModelo(c).length, 0, 'lista vazia explícita usa fallback seguro do perfil')
 }
 
-console.log('schedule profiles: 9 cenários aprovados')
+
+for (const modelo of ['tecnico','qualificacao','distribuicao_diaria','aprendizagem','personalizado']) {
+  const base = curso({modeloCronograma:modelo})
+  const antes = diasPermitidosEvento(item(),base,'presencial')
+  const efetivo = aplicarConfiguracaoTurma(base,{personalizarCronograma:true,configuracaoCronograma:{
+    presencial:{diasPermitidos:[2,4]},sincrono:{diasPermitidos:[1,3]},diasEstudoPermitidos:[1,2,3,4]
+  }})
+  assert.deepEqual(diasPermitidosEvento(item(),efetivo,'presencial'),[2,4],modelo+' deve permitir terça e quinta presenciais na turma')
+  assert.deepEqual(diasPermitidosEvento(item(),efetivo,'sincrono'),[1,3],modelo+' deve permitir dias síncronos específicos')
+  assert.deepEqual(resolverPerfilCronograma(efetivo).diasEstudoPermitidos,[1,2,3,4])
+  assert.deepEqual(diasPermitidosEvento(item(),base,'presencial'),antes,modelo+' não pode alterar o curso original')
+}
+
+console.log('schedule profiles: 9 cenários + personalização semanal dos cinco modelos aprovados')
