@@ -15,7 +15,7 @@ function sanitize_text_field( $value ) { return trim( strip_tags( (string) $valu
 $test_options = array();
 $test_transients = array();
 function get_option( $name, $fallback = false ) { global $test_options; return $test_options[ $name ] ?? $fallback; }
-function update_option( $name, $value, $autoload = null ) { global $test_options, $fail_option; if ( $fail_option === $name ) return false; $test_options[ $name ] = $value; return true; }
+function update_option( $name, $value, $autoload = null ) { global $test_options, $fail_option, $fail_compensation; if ( $fail_option === $name || ( ! empty( $fail_compensation ) && $name === 'cronograma_ead_data' && $value === wp_json_encode( array( 'cursos'=>array(), 'pessoas'=>array(), 'feriados'=>array(), 'unidades'=>array() ) ) ) ) return false; $test_options[ $name ] = $value; return true; }
 function add_option( $name, $value, $deprecated = '', $autoload = false ) { global $test_options; if ( array_key_exists( $name, $test_options ) ) { return false; } $test_options[ $name ] = $value; return true; }
 function delete_option( $name ) { global $test_options; unset( $test_options[ $name ] ); return true; }
 function wp_cache_delete( $key, $group = '' ) { return true; }
@@ -44,6 +44,14 @@ $failed = Cronograma_EAD_Store::save( array_merge( $catalog, array( 'feriados' =
 ensure( is_wp_error( $failed ) && 'cronograma_ead_gravacao' === $failed->code, 'Falha parcial na revisão deve retornar erro.' );
 $fail_option = null;
 ensure( Cronograma_EAD_Store::get()['data'] === $catalog && Cronograma_EAD_Store::get()['rev'] === 2, 'Falha parcial deve recuperar dados anteriores.' );
+// Se a escrita de revisão e a compensação falharem, não declarar recuperação.
+$fail_option = Cronograma_EAD_Store::OPT_REV;
+$fail_compensation = true;
+$failed_compensation = Cronograma_EAD_Store::save( array_merge( $catalog, array( 'feriados' => array( array( '2026-10-10', 'Erro injetado' ) ) ) ), 2 );
+ensure( is_wp_error( $failed_compensation ) && 'cronograma_ead_inconsistencia' === $failed_compensation->code, 'Compensação falha deve ser sinalizada como inconsistência crítica.' );
+$fail_option = null;
+$fail_compensation = false;
+update_option( Cronograma_EAD_Store::OPT_DATA, wp_json_encode( $catalog ), false );
 $read = Cronograma_EAD_Store::get();
 ensure( 2 === $read['rev'] && $read['data'] === $catalog, 'Catálogo e revisão devem concordar no fluxo sequencial.' );
 echo "OK catalog-integrity: gravação sequencial, conflito de revisão e leitura\n";
