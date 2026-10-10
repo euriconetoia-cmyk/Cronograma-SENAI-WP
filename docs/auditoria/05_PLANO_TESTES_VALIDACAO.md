@@ -164,3 +164,9 @@ Resultados confirmados no log:
 - Commit `306f1643a47fc12dc8b2db2ea5abc15823e7b471`: menus de conta e de navegação móvel passam a responder à tecla Escape enquanto estão abertos, com remoção dos listeners quando fecham.
 - Commit `563143f6421a0887ab439293f97583f423f93944`: gate estático confere a existência das duas ações de fechamento.
 - Ainda não há homologação manual de foco, leitor de tela, responsividade e WCAG. Resultados de CI novos devem ser consultados antes de declarar aprovação.
+
+
+## UX: retorno de foco ao fechar menus
+- Commit `85695f097a75d8e97f8a154297ed690684a04f88`: ao pressionar Escape nos menus de conta e navegação móvel, fecha o menu e devolve o foco ao botão que o abriu.
+- Commit `048aa17e4d98b6ab58381496229543417998b833`: gate estático exige fechamento e retorno de foco em ambos os casos.
+- Testes manuais em navegador/leitor de tela e resultado CI permanecem necessários para homologação de acessibilidade.
