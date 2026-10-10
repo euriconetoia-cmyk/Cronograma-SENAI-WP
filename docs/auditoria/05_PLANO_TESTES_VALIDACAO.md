@@ -101,3 +101,9 @@ Resultados confirmados no log:
 - CI #328 concluído com `success`, incluindo release gate e empacotamento; permanecem pendentes validações manuais e desempenho.
 - Commits `6882c9d88ae19767ed1f9e3d9e746038edb996b5` e `4872b388930cb195c2aed943744b5c0faff090e4`: `tests/calendar-contract.mjs` deixa de usar sua própria cópia da função `workday` e passa a importar a função real de `ui/src/lib/schedule.ts`, com carregamento TypeScript no release gate.
 - A cobertura verifica o cálculo com as fixtures existentes. Não constitui homologação de feriados estaduais/municipais por fontes oficiais nem validação visual por unidade.
+
+
+## Contrato do calendário — feriado aplicável versus não aplicável
+- Commit `67c43072fd6405f52f016993703a2fff8cd6ee55`: quatro cenários adicionais executam o `workday` real com e sem feriado aplicado ao calendário da turma, comprovando que uma data presente no conjunto bloqueia o dia útil e que uma data ausente não o bloqueia.
+- Esses casos usam datas sintéticas, **não homologam** cadastro/seleção territorial por UF ou município, nem confirmam feriados oficiais de Goiás. T-012 continua aberto até integração e dados locais serem validados em staging.
+- CI nº 338 estava em andamento no último acompanhamento; o novo commit demanda uma execução independente.
