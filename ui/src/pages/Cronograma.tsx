@@ -204,7 +204,7 @@ function CronogramaAberto() {
     if (!window.confirm('Recalcular o período até ' + fmt(t.fimManual) + '? Os encontros e momentos síncronos existentes serão substituídos para acompanhar as novas datas.')) return
     update(x => {
       const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
-      for (const item of Object.values(tt.itens)) { delete item.inicioPlanejado; delete item.enc; delete item.sin }
+      for (const [id, item] of Object.entries(tt.itens)) { if (curso.modulos.some(m => m.itens.some(it => it.id === id && it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) continue; delete item.inicioPlanejado; delete item.enc; delete item.sin }
       tt.itens[ultimo.it.id] = { ...(tt.itens[ultimo.it.id] || {}), inicioPlanejado: ultimo.c.J! }
       const g = compute(tt, curso, x.feriados)
       for (const [id, enc] of Object.entries(planejarEncontros(tt, g, x.feriados, false))) tt.itens[id] = { ...(tt.itens[id] || {}), enc }
