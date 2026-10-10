@@ -146,3 +146,9 @@ Resultados confirmados no log:
 - Commit `27732e6fab02b63f49ec5d642fda49bc3270c347`: o teste `holiday-provider-degraded.php` passa a simular `WP_Error('http_request_failed')` nas consultas estadual e municipal, além de HTTP 200 com JSON inválido.
 - Critério: duas requisições interceptadas, dois avisos de falha, nenhum feriado regional inventado e expiração do cache em até 15 minutos.
 - São testes sintéticos em WordPress descartável; não comprovam confiabilidade de provedor real, confirmação de feriado oficial ou homologação por município. Resultado do CI ainda pendente.
+
+
+## Início da etapa PERF — baseline reproduzível de artefatos
+- Commit `dfc18ff24b4759f430a2a393aa7fa7a64bf63a46`: script de baseline do bundle WordPress e preview, em bytes, bytes gzip e SHA-256, usando artefatos efetivamente gerados no runner.
+- Commit `905da84dbcc1df99325eaba6e5b76af6ec036a98`: execução do baseline após os builds no release gate. O output precisa ser recolhido e comparado entre SHAs para servir de evidência.
+- Essas métricas não substituem testes de p50/p95, volume SQL com EXPLAIN, React Profiler, rede ou navegador; T-015 a T-017 continuam abertos.
