@@ -177,3 +177,18 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Commit `b7de679238d2e1f09751bd3af23c73fa1a27ccca`: ao falhar a atualização da revisão, o sistema testa a gravação compensatória do catálogo. Se a compensação falhar e o dado anterior não tiver sido restaurado, retorna `cronograma_ead_inconsistencia` com mensagem explícita de intervenção/recuperação de backup; não afirma que os dados foram recuperados.
 - Commit `0665e2b2313403b451c04fb39710b643ff9ddc0e`: teste de unidade com falha injetada na atualização de revisão e na compensação, exigindo sinalização de inconsistência crítica.
 - **Atenção:** a alteração detecta falha; não torna duas opções WordPress transacionais. Bloqueio persistente de novas gravações, quarentena operacional e migração para armazenamento atomicamente versionado continuam como trabalho pendente. CI ainda não validado na consulta.
+
+
+## Procedimento seguro para bloqueio órfão do catálogo
+O lock `cronograma_ead_catalog_write_lock` utiliza uma opção WordPress exclusiva. Se o processo PHP terminar sem executar o `finally`, o lock pode persistir. **Não** expirar nem remover automaticamente com base apenas no tempo: outra requisição pode estar validamente escrevendo ou lenta.
+
+1. Suspender novas gravações no catálogo (modo manutenção ou bloqueio administrativo operacional) e confirmar ausência de requisições de escrita ativas nos logs do servidor e do banco.
+2. Criar e verificar backup consistente do catálogo e das tabelas do plugin; conferir revisão atual do catálogo.
+3. Em ambiente seguro e com WordPress carregado, consultar `wp option get cronograma_ead_catalog_write_lock` para confirmar existência. Registrar valor e horário para auditoria.
+4. Após confirmação operacional de que não existe escritor ativo, remover exclusivamente esse lock com `wp option delete cronograma_ead_catalog_write_lock`; não remover `cronograma_ead_rev` nem `cronograma_ead_data`.
+5. Reabrir gravacões com um operador, confirmar incremento da revisão e executar novo teste de duas gravações concorrentes contra cópia descartável da base.
+
+### Critérios de aceite restantes
+- CI #316 e #322 concluídos em `success` no GitHub Actions; CI #328 estava em execução, com etapa de empacotamento ainda em curso na última consulta.
+- Recuperação de lock órfão permanece um **procedimento manual**, não uma funcionalidade autônoma implementada.
+- Ainda falta teste controlado de interrupção abrupta de processo, atomicidade entre as opções de dados/revisão, casos de feriados regionais com fontes homologadas, WCAG/UX, performance comparativa e staging.
