@@ -25,7 +25,7 @@ export function CursosPage() {
   const mut = (fn: (c: Curso) => void) => update(x => { fn(x.cursos.find(a => a.id === c.id)!) })
 
   const novo = () => {
-    const n: Curso = { id: uid('c'), nome: 'Novo curso', categoria: '', modalidade: 'ead', modeloCronograma: 'qualificacao', chTotal: 0, nota: '', regras: { hEncontro: 8, webDias: 10, webHora: '15h', postDias: 3, horario: '08:00h às 17:00h' }, modulos: [{ id: uid('m'), nome: 'Módulo 1', itens: [] }] }
+    const n: Curso = { id: uid('c'), nome: 'Novo curso', categoria: '', modalidade: 'ead', modeloCronograma: 'qualificacao', chTotal: 0, nota: '', regras: { hEncontro: 8, webDias: 10, webHora: '15h', postDias: 3, horario: '08:00h às 17:00h' }, modulos: [{ id: uid('m'), nome: 'Módulo 1', itens: [{ ...novoItem('intro'), nome: 'Ambientação', ch: 0, pres: 0, div: 0 }] }] }
     update(x => { x.cursos.push(n) }); setCursoId(n.id)
   }
   const duplicar = () => { const n: Curso = JSON.parse(JSON.stringify(c)); n.id = uid('c'); n.nome = `${c.nome} (cópia)`; n.modulos.forEach(m => { m.id = uid('m'); m.itens.forEach(i => { i.id = uid('i') }) }); update(x => { x.cursos.push(n) }); setCursoId(n.id); toast('Curso duplicado.') }
@@ -130,6 +130,7 @@ export function CursosPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 bg-row-mod px-3 py-2">
               <input aria-label="Nome do módulo" className="cell-input max-w-xs font-heading text-[15px] font-semibold" value={m.nome} onChange={e => mut(k => { k.modulos[mi].nome = e.target.value })} />
               <div className="flex flex-wrap items-center gap-1.5">
+                {!c.modulos.some(mod => mod.itens.some(item => item.tipo === 'intro' && item.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação')) && <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.unshift({ ...novoItem('intro'), nome: 'Ambientação', ch: 0, pres: 0, div: 0 }) })}><Plus size={13} />Ambientação (fora da CH)</Button>}
                 <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.push(novoItem('uc')) })}><Plus size={13} />{T.cursos.addUC}</Button>
                 <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.push(novoItem('rec')) })}><Plus size={13} />{T.cursos.addRec}</Button>
                 <Button size="sm" variant="outline" onClick={() => mut(k => { k.modulos[mi].itens.push(novoItem('mat')) })}><Plus size={13} />{T.cursos.addMat}</Button>
