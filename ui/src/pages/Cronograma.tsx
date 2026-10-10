@@ -261,6 +261,11 @@ function CronogramaAberto() {
               ? <p className="mt-1 text-xs text-muted-foreground">Data alterada manualmente. Calculado: <b className="mono">{fmt(G.end)}</b>{t.fimManual < G.end ? ' (a nova data é anterior ao cálculo)' : ''}. {podeCalcular && <button type="button" className="underline" onClick={() => setFim('')}>Voltar ao cálculo</button>}</p>
               : <p className="mt-1 text-xs text-muted-foreground">Calculado pelas cargas e feriados. Você pode estender ou alterar a data.</p>)}
           </Field>
+          {curso.modulos.flatMap(m => m.itens).filter(it => it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação').map(it => (
+            <Field key={it.id} label="Data da Ambientação (manual, fora da CH)">
+              <input type="date" className="field-input" disabled={!podeCalcular} value={t.itens[it.id]?.inicioPlanejado || ''} onChange={e => setItem(it.id, { inicioPlanejado: e.target.value })} />
+            </Field>
+          ))}
           <Field label="Nome da turma"><input className="field-input" disabled={!podeCalcular} value={t.nome} onChange={e => update(x => { x.turmas.find(a => a.id === t.id)!.nome = e.target.value })} /></Field>
           {comPres && <Field label="Ambiente"><input className="field-input" disabled={lAj} value={t.ambiente} onChange={e => update(x => { x.turmas.find(a => a.id === t.id)!.ambiente = e.target.value })} /></Field>}
         </div>
