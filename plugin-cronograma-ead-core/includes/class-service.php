@@ -856,7 +856,7 @@ class Cronograma_EAD_Service {
 		$res = wp_safe_remote_get( $url_estado, array( 'timeout' => 10, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
 		if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
 			$body_estado = json_decode( wp_remote_retrieve_body( $res ), true );
-			if ( ! is_array( $body_estado ) || ! array_is_list( $body_estado ) ) {
+			if ( ! is_array( $body_estado ) ) {
 				$avisos[] = 'A fonte estadual retornou dados inválidos.';
 				$body_estado = array();
 			}
