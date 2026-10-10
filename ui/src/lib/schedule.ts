@@ -117,6 +117,24 @@ export function simularRecalculoPeriodo(
   if (fimDeslocado !== fim) return { ok: false, motivo: 'Não foi possível preservar a duração pedagógica da etapa final nesse calendário.' }
   last.c.J = inicioDeslocado
   last.c.K = fimDeslocado
+  // Distribui parte da folga entre as UCs intermediárias, sempre preservando
+  // as datas manuais da Ambientação e as durações originais.
+  const folga = toN(inicioDeslocado) - toN(base.rows[base.rows.length - 1].c.J!)
+  for (let i = 1; i < rows.length - 1; i++) {
+    const row = rows[i]
+    if (!row.c.J || !row.c.K || row.it.tipo === 'intro') continue
+    const diasEtapa = resolverPerfilItem(row.it, curso).diasEstudoPermitidos
+    const aceitos = new Set(diasEtapa.length ? diasEtapa : [1, 2, 3, 4, 5])
+    let inicioNovo = toN(row.c.J) + Math.floor(folga * i / (rows.length - 1))
+    while (!aceitos.has(dow(inicioNovo)) || hol.has(toS(inicioNovo))) inicioNovo++
+    const anterior = rows[i - 1].c.K
+    if (anterior && toS(inicioNovo) <= anterior)
+      inicioNovo = toN(workdayPermitidos(anterior, 1, hol, diasEtapa))
+    const fimNovo = workdayPermitidos(toS(inicioNovo), row.c.I, hol, diasEtapa)
+    if (fimNovo >= inicioDeslocado) continue // preservar a viabilidade já comprovada
+    row.c.J = toS(inicioNovo)
+    row.c.K = fimNovo
+  }
   const by = Object.fromEntries(rows.map(r => [r.it.id, r])) as Record<string, Row>
   return { ok: true, plano: { ...base, rows, by, end: fim } }
 }
