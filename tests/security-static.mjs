@@ -16,6 +16,7 @@ const shell = read('ui/src/components/Shell.tsx');
 const integracoes = read('ui/src/pages/Integracoes.tsx');
 
 checks.push([shell.includes('href="#conteudo-principal"') && shell.includes('id="conteudo-principal"') && shell.includes('tabIndex={-1}'), 'Keyboard skip link targets focusable main landmark']);
+checks.push([shell.includes("if (e.key === 'Escape') setAberto(false)") && shell.includes("if (e.key === 'Escape') setMais(false)"), 'Navigation popovers close with Escape']);
 checks.push([roles.includes("set_caps( get_role( 'editor' ), array() )"), 'Editor has Cronogramas capabilities stripped']);
 checks.push([!accounts.match(/return\s+array\s*\([^)]*['\"]link['\"]/s), 'Password reset endpoint does not return link']);
 checks.push([accounts.includes('2 * HOUR_IN_SECONDS'), 'Reset expiration hardened to 2 hours']);
