@@ -194,7 +194,7 @@ function CronogramaAberto() {
   const setFim = (v: string) => update(x => { const a = x.turmas.find(a => a.id === t.id)!; if (v && v !== G.end) a.fimManual = v; else delete a.fimManual })
   const recalcularPeriodo = () => {
     if (!podeCalcular || !t.inicio || !t.fimManual) return
-    const semMarcos = { ...t, itens: Object.fromEntries(Object.entries(t.itens).map(([id, it]) => [id, { ...it, inicioPlanejado: undefined }])) }
+    const semMarcos = { ...t, itens: Object.fromEntries(Object.entries(t.itens).map(([id, it]) => [id, { ...it, inicioPlanejado: curso.modulos.some(m => m.itens.some(item => item.id === id && item.tipo === 'intro' && item.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação')) ? it.inicioPlanejado : undefined }])) }
     const sim = simularRecalculoPeriodo(semMarcos, curso, d.feriados, t.fimManual)
     if (!sim.ok) { window.alert(sim.motivo); return }
     const ultimo = sim.plano.rows.at(-1)
