@@ -31,6 +31,8 @@ bash tests/performance-artifact-baseline.sh
 command -v docker >/dev/null || { echo 'BLOQUEIO: Docker não instalado.' >&2; exit 22; }
 docker compose up -d db wordpress
 IDS="$(bash tests/setup-wp.sh | tail -1)"
+# Latência HTTP anônima em WordPress descartável; dados do runner não representam produção.
+node tests/performance-http-baseline.mjs
 node tests/e2e.mjs "$IDS"
 node tests/acessos.mjs "$IDS"
 node tests/avisos.mjs "$IDS"
