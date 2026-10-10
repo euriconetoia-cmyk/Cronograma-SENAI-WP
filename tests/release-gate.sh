@@ -34,5 +34,7 @@ node tests/acessos.mjs "$IDS"
 node tests/avisos.mjs "$IDS"
 # Falha SQL deliberada somente no WordPress local de CI; verifica rollback integral.
 docker compose run --rm -v "$ROOT/tests:/tmp/ce-tests:ro" wpcli --path=/var/www/html eval-file /tmp/ce-tests/restore-rollback.php
+# Provedores estaduais/municipais simulados: bloqueia rede e verifica TTL do cache degradado.
+docker compose run --rm -v "$ROOT/tests:/tmp/ce-tests:ro" wpcli --path=/var/www/html eval-file /tmp/ce-tests/holiday-provider-degraded.php
 
 echo 'RELEASE GATE: APROVADO'
