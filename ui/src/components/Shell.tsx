@@ -159,7 +159,7 @@ function BarraInferior({ entradas, atual, count, validar, go, page }: { entradas
     )
   }
   return (
-    <div ref={ref} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 lg:hidden">
+    <div ref={ref} className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
       {mais && (
         <div role="menu" className="ce-pop mb-2 ml-auto w-56 rounded-xl border bg-card p-1.5 shadow-xl">
           {resto.map(p => { const Ic = ICONES[p] ?? CalendarDays; return (
