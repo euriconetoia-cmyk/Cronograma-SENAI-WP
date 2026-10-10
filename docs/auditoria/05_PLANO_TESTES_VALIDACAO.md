@@ -107,3 +107,9 @@ Resultados confirmados no log:
 - Commit `67c43072fd6405f52f016993703a2fff8cd6ee55`: quatro cenários adicionais executam o `workday` real com e sem feriado aplicado ao calendário da turma, comprovando que uma data presente no conjunto bloqueia o dia útil e que uma data ausente não o bloqueia.
 - Esses casos usam datas sintéticas, **não homologam** cadastro/seleção territorial por UF ou município, nem confirmam feriados oficiais de Goiás. T-012 continua aberto até integração e dados locais serem validados em staging.
 - CI nº 338 estava em andamento no último acompanhamento; o novo commit demanda uma execução independente.
+
+
+## Teste de isolamento territorial de calendário
+- Commit `07a5004a3f5ddade1d291c173a725d2bf0b2ff0b`: valida `feriadosDaTurma()` real com feriado geral e feriados restritos às unidades A/B; verifica que cada calendário exclui feriados de outra unidade e que `workday()` usa o conjunto filtrado.
+- Teste sintético de escopo por `unidadeId`; **não comprova** a origem correta de feriados nacionais, estaduais/municipais nem cobertura por UF e município. A homologação das fontes e dos calendários territoriais no staging permanece aberta.
+- Executar CI do commit e manter status `pendente` até a evidência do pipeline.
