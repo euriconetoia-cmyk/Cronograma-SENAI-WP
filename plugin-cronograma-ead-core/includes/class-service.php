@@ -899,7 +899,11 @@ class Cronograma_EAD_Service {
 			'municipalConfigurado' => '' !== $api_key,
 			'avisos' => $avisos,
 		);
-		set_transient( $cache_key, $ret, 7 * DAY_IN_SECONDS );
+		// Não manter por sete dias um resultado incompleto causado por timeout,
+		// indisponibilidade do provedor ou integração municipal ainda desabilitada.
+		// Cache curto permite reconsulta sem sobrecarregar as fontes externas.
+		$ttl = empty( $avisos ) ? 7 * DAY_IN_SECONDS : 15 * MINUTE_IN_SECONDS;
+		set_transient( $cache_key, $ret, $ttl );
 		return $ret;
 	}
 
