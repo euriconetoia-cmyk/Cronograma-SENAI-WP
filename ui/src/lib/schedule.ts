@@ -85,7 +85,7 @@ export function simularRecalculoPeriodo(
   feriados: Feriado[],
   fim: string
 ): { ok: true; plano: Result } | { ok: false; motivo: string } {
-  if (!t.inicio || !/^\\d{4}-\\d{2}-\\d{2}$/.test(fim) || fim < t.inicio)
+  if (!t.inicio || !/^\d{4}-\d{2}-\d{2}$/.test(fim) || fim < t.inicio)
     return { ok: false, motivo: 'Informe datas válidas de início e término, em ordem cronológica.' }
   const base = compute(t, curso, feriados)
   if (!base.end || !base.rows.length) return { ok: false, motivo: 'O curso não possui etapas calculáveis.' }
