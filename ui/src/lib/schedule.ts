@@ -96,21 +96,24 @@ export function simularRecalculoPeriodo(
   const dias = resolverPerfilItem(ultimo.it, curso).diasEstudoPermitidos
   const dateValid = (v: string) => !hol.has(v) && (dias.length ? dias : [1, 2, 3, 4, 5]).includes(dow(toN(v)))
   if (!dateValid(fim)) return { ok: false, motivo: 'O término solicitado cai em feriado ou dia não permitido pelo modelo da última etapa.' }
-  // A folga deve ser composta de dias permitidos da última etapa, sem inventar carga horária.
-  let acrescentar = 0, data = base.end
-  while (data < fim && acrescentar <= 3660) {
-    data = workdayPermitidos(data, 1, hol, dias)
-    acrescentar++
-  }
-  if (data !== fim) return { ok: false, motivo: 'Não foi possível alinhar o término às regras de calendário do curso.' }
-  // Uma única etapa não recebe folga artificial; precisamos preservar a duração fixa da UC.
+  // Reconstrói o começo da última etapa de trás para frente: deslocamentos
+  // fixos não são reversíveis quando há feriados no meio do intervalo.
   if (base.rows.length < 2) return { ok: false, motivo: 'Não é possível alongar uma única etapa sem alterar sua duração ou as regras do curso.' }
-  // Aplica a folga antes da última etapa. Esta solução conservadora mantém as UCs anteriores intactas.
   const rows = base.rows.map(r => ({ ...r, c: { ...r.c } }))
   const last = rows[rows.length - 1]
   if (!last.c.J || !last.c.K) return { ok: false, motivo: 'A última etapa não possui datas calculadas.' }
-  const inicioDeslocado = workdayPermitidos(last.c.J, acrescentar, hol, dias)
-  const fimDeslocado = workdayPermitidos(last.c.K, acrescentar, hol, dias)
+  const permitidos = new Set(dias.length ? dias : [1, 2, 3, 4, 5])
+  let dataInicio = toN(fim)
+  let restantes = last.c.I
+  while (restantes > 0) {
+    dataInicio--
+    const data = toS(dataInicio)
+    if (permitidos.has(dow(dataInicio)) && !hol.has(data)) restantes--
+  }
+  const inicioDeslocado = toS(dataInicio)
+  if (inicioDeslocado < last.c.J || (rows[rows.length - 2].c.K && inicioDeslocado <= rows[rows.length - 2].c.K!))
+    return { ok: false, motivo: 'O término exige sobreposição ou antecipação de etapas; mantenha as cargas e escolha outra data.' }
+  const fimDeslocado = workdayPermitidos(inicioDeslocado, last.c.I, hol, dias)
   if (fimDeslocado !== fim) return { ok: false, motivo: 'Não foi possível preservar a duração pedagógica da etapa final nesse calendário.' }
   last.c.J = inicioDeslocado
   last.c.K = fimDeslocado
