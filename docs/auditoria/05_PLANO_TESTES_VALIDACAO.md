@@ -152,3 +152,9 @@ Resultados confirmados no log:
 - Commit `dfc18ff24b4759f430a2a393aa7fa7a64bf63a46`: script de baseline do bundle WordPress e preview, em bytes, bytes gzip e SHA-256, usando artefatos efetivamente gerados no runner.
 - Commit `905da84dbcc1df99325eaba6e5b76af6ec036a98`: execução do baseline após os builds no release gate. O output precisa ser recolhido e comparado entre SHAs para servir de evidência.
 - Essas métricas não substituem testes de p50/p95, volume SQL com EXPLAIN, React Profiler, rede ou navegador; T-015 a T-017 continuam abertos.
+
+
+## Baseline HTTP local sintético
+- Commit `c1f01a1ceea1680148bcdc4e5163c2e1976ebf1e`: sonda HTTP anônima com 8 requisições sequenciais aos caminhos `/` e `/?rest_route=/` do WordPress descartável. Registra mínimo, mediana, p95 amostral e máximo em milissegundos, sem armazenar credenciais.
+- Commit `66b667c33776233950d95732a1546b0c416ce5a8`: integrado ao gate após a criação das fixtures WP, antes dos testes E2E.
+- **Interpretação:** p95 com oito amostras sequenciais não estima a experiência em produção, nem testa operações autenticadas, tempo SQL ou desempenho de geração de cronogramas. São números comparativos iniciais do runner; staging e testes de carga/SQL continuam pendentes.
