@@ -103,16 +103,17 @@ function ItemTopo({ p, ativo, n, aviso, go }: { p: string; ativo: boolean; n?: n
 function MenuUsuario({ me, dark, setDark, wp, logout, estado, salvo }: { me: { nome: string; perfil: 'equipe' | 'unidade' | 'consulta'; validador?: boolean }; dark: boolean; setDark: (f: (v: boolean) => boolean) => void; wp: boolean; logout?: string; estado: string; salvo: string }) {
   const [aberto, setAberto] = useState(false)
   const ref = useFora(aberto, () => setAberto(false))
+  const gatilho = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!aberto) return
-    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false) }
+    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') { setAberto(false); gatilho.current?.focus() } }
     document.addEventListener('keydown', fechar)
     return () => document.removeEventListener('keydown', fechar)
   }, [aberto])
   const ini = (me.nome || '?').trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase()
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setAberto(v => !v)} aria-haspopup="menu" aria-expanded={aberto} aria-label={`Conta de ${me.nome}`}
+      <button ref={gatilho} type="button" onClick={() => setAberto(v => !v)} aria-haspopup="menu" aria-expanded={aberto} aria-label={`Conta de ${me.nome}`}
         className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 outline-none hover:bg-secondary focus-visible:ring-2 focus-visible:ring-primary">
         <span className="grid h-8 w-8 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{ini}</span>
         <span className="hidden text-left text-xs leading-tight md:block"><span className="block font-semibold">{me.nome}</span><span className="block text-muted-foreground">{T.perfil[me.perfil]}{me.perfil === 'unidade' && me.validador ? ' · valida' : ''}</span></span>
@@ -133,9 +134,10 @@ function MenuUsuario({ me, dark, setDark, wp, logout, estado, salvo }: { me: { n
 function BarraInferior({ entradas, atual, count, validar, go, page }: { entradas: string[]; atual: string; count: Partial<Record<string, number>>; validar: number; go: (p: Page) => void; page: string }) {
   const [mais, setMais] = useState(false)
   const ref = useFora(mais, () => setMais(false))
+  const gatilhoMais = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     if (!mais) return
-    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') setMais(false) }
+    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMais(false); gatilhoMais.current?.focus() } }
     document.addEventListener('keydown', fechar)
     return () => document.removeEventListener('keydown', fechar)
   }, [mais])
@@ -146,7 +148,7 @@ function BarraInferior({ entradas, atual, count, validar, go, page }: { entradas
   const Item = ({ p, ativo, onClick, rotulo, n, aviso }: { p: string; ativo: boolean; onClick: () => void; rotulo: string; n?: number; aviso?: boolean }) => {
     const Ic = p === 'mais' ? Ellipsis : ICONES[p] ?? CalendarDays
     return (
-      <button type="button" onClick={onClick} aria-current={ativo ? 'page' : undefined} aria-expanded={p === 'mais' ? mais : undefined} data-ativo={ativo || undefined}
+      <button ref={p === 'mais' ? gatilhoMais : undefined} type="button" onClick={onClick} aria-current={ativo ? 'page' : undefined} aria-expanded={p === 'mais' ? mais : undefined} data-ativo={ativo || undefined}
         aria-label={rotulo} title={rotulo}
         className={`ce-menu-item relative flex min-h-[52px] min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary ${ativo ? 'ce-m-ativo bg-primary/10 text-primary' : 'ce-m-quieto text-muted-foreground'}`}>
         <span className="ce-menu-icone relative"><Ic size={22} strokeWidth={ativo ? 2.2 : 1.7} />
