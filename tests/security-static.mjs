@@ -12,6 +12,7 @@ const notify = read('plugin-cronograma-ead-core/includes/class-notify.php');
 const ui = read('ui/src/pages/Acessos.tsx');
 const schedule = read('ui/src/lib/schedule.ts');
 const cronograma = read('ui/src/pages/Cronograma.tsx');
+checks.push([cronograma.includes('Dias permitidos nesta turma') && cronograma.includes('alterarDias(tipo, dia)') && cronograma.includes('Restaurar dias do curso'), 'Class-level weekday customization exists for all models']);
 checks.push([schedule.includes('export function simularRecalculoPeriodo') && cronograma.includes('Recalcular cronograma até o término') && cronograma.includes('teste.end !== t.fimManual'), 'Manual end-date recalculation has preflight and confirmation']);
 checks.push([cronograma.includes('Data da Ambientação (manual, fora da CH)') && schedule.includes('inicioPlanejado'), 'Ambientacao manual date supported without curricular hours']);
 const shell = read('ui/src/components/Shell.tsx');
