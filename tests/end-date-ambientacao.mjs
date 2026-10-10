@@ -24,6 +24,10 @@ for (const modelo of ['tecnico', 'qualificacao', 'distribuicao_diaria', 'aprendi
   assert.equal(sim.ok,true,modelo+' deve aceitar folga viável')
   assert.equal(sim.plano.end,alvo)
   assert.equal(sim.plano.sumUC,80)
+  assert.ok(sim.plano.rows[1].c.J >= base.rows[1].c.J,modelo+' distribuição não pode antecipar UCs')
+  const marcos = Object.fromEntries(sim.plano.rows.filter(r=>r.it.tipo!=='intro').map(r=>[r.it.id,{inicioPlanejado:r.c.J}]))
+  assert.equal(compute({...turma,itens:marcos},curso,feriados).end,alvo,
+    modelo+' todas as datas planejadas precisam persistir o término')
   const itensSalvos = { b:{inicioPlanejado:sim.plano.rows.at(-1).c.J} }
   assert.equal(compute({...turma,itens:itensSalvos},curso,feriados).end,alvo,
     modelo+' o término precisa sobreviver à recomputação com dados persistidos')
