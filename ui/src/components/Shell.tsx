@@ -103,6 +103,12 @@ function ItemTopo({ p, ativo, n, aviso, go }: { p: string; ativo: boolean; n?: n
 function MenuUsuario({ me, dark, setDark, wp, logout, estado, salvo }: { me: { nome: string; perfil: 'equipe' | 'unidade' | 'consulta'; validador?: boolean }; dark: boolean; setDark: (f: (v: boolean) => boolean) => void; wp: boolean; logout?: string; estado: string; salvo: string }) {
   const [aberto, setAberto] = useState(false)
   const ref = useFora(aberto, () => setAberto(false))
+  useEffect(() => {
+    if (!aberto) return
+    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') setAberto(false) }
+    document.addEventListener('keydown', fechar)
+    return () => document.removeEventListener('keydown', fechar)
+  }, [aberto])
   const ini = (me.nome || '?').trim().split(/\s+/).map(x => x[0]).slice(0, 2).join('').toUpperCase()
   return (
     <div ref={ref} className="relative">
@@ -127,6 +133,12 @@ function MenuUsuario({ me, dark, setDark, wp, logout, estado, salvo }: { me: { n
 function BarraInferior({ entradas, atual, count, validar, go, page }: { entradas: string[]; atual: string; count: Partial<Record<string, number>>; validar: number; go: (p: Page) => void; page: string }) {
   const [mais, setMais] = useState(false)
   const ref = useFora(mais, () => setMais(false))
+  useEffect(() => {
+    if (!mais) return
+    const fechar = (e: KeyboardEvent) => { if (e.key === 'Escape') setMais(false) }
+    document.addEventListener('keydown', fechar)
+    return () => document.removeEventListener('keydown', fechar)
+  }, [mais])
   if (CONFIG_PAGES.includes(page as Page)) ultimaConfig = page as Page
   const cabem = entradas.length <= 5
   const fixos = cabem ? entradas : entradas.slice(0, 4), resto = cabem ? [] : entradas.slice(4)
