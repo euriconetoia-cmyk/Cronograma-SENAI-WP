@@ -79,6 +79,15 @@ c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_turma($bad_t)),'unknown pedagogi
 $bad_t=$turma; $bad_t['itens']['i1']['eventos'][0]['d']='2026-02-31';
 c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_turma($bad_t)),'invalid pedagogical event date must be rejected');
 
+$recalc = $turma;
+$recalc['itens']['i1']['inicioPlanejado'] = '2026-03-11';
+$clean = Cronograma_EAD_Store::sanitize_turma($recalc);
+c_ok(!is_wp_error($clean) && $clean['itens']['i1']['inicioPlanejado'] === '2026-03-11', 'manual stage start must survive backend sanitization');
+$bad_date = $recalc;
+$bad_date['itens']['i1']['inicioPlanejado'] = '2026-02-31';
+c_ok(is_wp_error(Cronograma_EAD_Store::sanitize_turma($bad_date)), 'invalid planned stage start must be rejected');
+echo "OK planned stage start contract\n";
+
 echo "OK pedagogical-event contract\n";
 
 
