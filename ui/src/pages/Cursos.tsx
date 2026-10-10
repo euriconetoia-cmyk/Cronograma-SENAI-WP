@@ -43,7 +43,22 @@ export function CursosPage() {
 
   return (
     <div className="grid gap-4 md:grid-cols-[minmax(240px,300px)_minmax(0,1fr)]">
-      <Panel className={detalhe ? 'max-md:hidden' : ''} title={T.cursos.titulo} actions={<Button size="sm" onClick={novo}><Plus size={14} />{T.cursos.novo}</Button>}>
+      <Panel className={detalhe ? 'max-md:hidden' : ''} title={T.cursos.titulo} actions={<div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" onClick={() => {
+          const faltantes = d.cursos.filter(c => !c.modulos.some(m => m.itens.some(i => i.tipo === 'intro' && i.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação')))
+          if (!faltantes.length) { toast('Todos os cursos já possuem Ambientação.'); return }
+          if (!window.confirm(`Adicionar Ambientação sem carga horária a ${faltantes.length} curso(s), sem alterar a CH existente?`)) return
+          update(x => {
+            for (const curso of x.cursos) {
+              if (curso.modulos.some(m => m.itens.some(i => i.tipo === 'intro' && i.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) continue
+              if (!curso.modulos.length) curso.modulos.push({ id: uid('m'), nome: 'Módulo 1', itens: [] })
+              curso.modulos[0].itens.unshift({ ...novoItem('intro'), nome: 'Ambientação', ch: 0, pres: 0, div: 0 })
+            }
+          })
+          toast('Ambientação incluída nos cursos que ainda não a possuíam.')
+        }}>Regularizar Ambientação</Button>
+        <Button size="sm" onClick={novo}><Plus size={14} />{T.cursos.novo}</Button>
+      </div>}>
         <ul className="flex flex-col gap-1.5">
           {d.cursos.map(x => {
             const n = x.modulos.reduce((s, m) => s + m.itens.filter(i => i.tipo === 'uc').length, 0)
