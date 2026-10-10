@@ -337,8 +337,8 @@ class Cronograma_EAD_Store {
 		if ( count( $in_itens ) > 500 ) {
 			return new WP_Error( 'cronograma_ead_grande', 'Quantidade excessiva de etapas na turma.', array( 'status' => 413 ) );
 		}
-		$item_allowed = array( 'enc', 'sin', 'eventos', 'rec', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'scorm', 'apostila', 'aval', 'pesq', 'media', 'idm' );
-		$item_limits = array( 'rec' => 2000, 'evento' => 190, 'monitorId' => 64, 'tutorId' => 64, 'coordId' => 64, 'profId' => 64, 'ambiente' => 190, 'scorm' => 190, 'apostila' => 190, 'aval' => 190, 'pesq' => 190, 'media' => 190, 'idm' => 190 );
+		$item_allowed = array( 'inicioPlanejado', 'enc', 'sin', 'eventos', 'rec', 'evento', 'monitorId', 'tutorId', 'coordId', 'profId', 'ambiente', 'scorm', 'apostila', 'aval', 'pesq', 'media', 'idm' );
+		$item_limits = array( 'inicioPlanejado' => 10, 'rec' => 2000, 'evento' => 190, 'monitorId' => 64, 'tutorId' => 64, 'coordId' => 64, 'profId' => 64, 'ambiente' => 190, 'scorm' => 190, 'apostila' => 190, 'aval' => 190, 'pesq' => 190, 'media' => 190, 'idm' => 190 );
 		foreach ( $in_itens as $id => $it ) {
 			$id = (string) $id;
 			if ( ! self::valid_id( $id ) || ! is_array( $it ) ) {
@@ -358,6 +358,9 @@ class Cronograma_EAD_Store {
 					}
 					$clean_item[ $k ] = $v;
 				}
+			}
+			if ( ! empty( $clean_item['inicioPlanejado'] ) && ! Cronograma_EAD_Rules::data_ok( $clean_item['inicioPlanejado'] ) ) {
+				return new WP_Error( 'cronograma_ead_data', "Data de início planejado inválida na etapa $id.", array( 'status' => 422 ) );
 			}
 			foreach ( array( 'enc' => 'Encontros', 'sin' => 'Momentos síncronos' ) as $campo_momento => $rotulo_momento ) {
 				if ( ! isset( $it[ $campo_momento ] ) ) {
