@@ -170,3 +170,9 @@ Resultados confirmados no log:
 - Commit `85695f097a75d8e97f8a154297ed690684a04f88`: ao pressionar Escape nos menus de conta e navegação móvel, fecha o menu e devolve o foco ao botão que o abriu.
 - Commit `048aa17e4d98b6ab58381496229543417998b833`: gate estático exige fechamento e retorno de foco em ambos os casos.
 - Testes manuais em navegador/leitor de tela e resultado CI permanecem necessários para homologação de acessibilidade.
+
+
+## UX móvel — área segura do dispositivo
+- Commit `683d184e3e80c7ad73f814d468229e41c40bdf34`: barra de navegação inferior considera `env(safe-area-inset-bottom)` para não aproximar excessivamente os controles da área reservada a gestos do sistema operacional.
+- Commit `3dcb00bb0abc60991a771ee0a31b5b5656a5ab61`: teste estático de regressão do espaçamento da área segura.
+- A verificação visual em celulares reais, com e sem área de gestos, continua pendente; não declarar homologação antes dessa validação.
