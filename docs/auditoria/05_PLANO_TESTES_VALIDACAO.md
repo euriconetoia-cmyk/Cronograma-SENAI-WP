@@ -113,3 +113,9 @@ Resultados confirmados no log:
 - Commit `07a5004a3f5ddade1d291c173a725d2bf0b2ff0b`: valida `feriadosDaTurma()` real com feriado geral e feriados restritos às unidades A/B; verifica que cada calendário exclui feriados de outra unidade e que `workday()` usa o conjunto filtrado.
 - Teste sintético de escopo por `unidadeId`; **não comprova** a origem correta de feriados nacionais, estaduais/municipais nem cobertura por UF e município. A homologação das fontes e dos calendários territoriais no staging permanece aberta.
 - Executar CI do commit e manter status `pendente` até a evidência do pipeline.
+
+
+## Resiliência de cache de feriados regionais — 09/10/2026
+- Commit `b98e6a0cd9a7924f935b762d38673128cd59afda`: respostas regionais completas mantêm cache de sete dias; respostas com avisos por falha de integração, indisponibilidade ou ausência de chave municipal passam a ter TTL de quinze minutos. Isso evita manter por uma semana um calendário incompleto após falha temporária.
+- Commit `69b47ff14b60b09dcf2a7c270d64b25b0a4dcff1`: verificação estática no release gate protege a regra de cache reduzido.
+- Trata-se de resiliência técnica, não confirmação do conteúdo das fontes externas. Ainda exige teste dinâmico com provedores offline/timeout e homologação de fontes por UF e município.
