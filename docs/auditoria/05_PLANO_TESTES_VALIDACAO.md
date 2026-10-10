@@ -127,3 +127,9 @@ Resultados confirmados no log:
 - Correção do PHP em `2166d80123b31039228175f685e11b3dd15dfb1f`: `15 * 60` segundos, sem dependência dessa constante no escopo de análise estática.
 - Teste estático alinhado em `6eba3f188c01f01a2bee911d87e6b05accd597ce`.
 - O CI do código corrigido deve ser confirmado antes de considerar a correção validada; homologação de feriados estaduais e municipais ainda pendente.
+
+
+## Proteção contra respostas inválidas de APIs regionais
+- Commits `820441f1`, `d941ced`, `6f11f17`: consultas estaduais e municipais com HTTP 200 e corpo JSON inválido passam a produzir avisos de degradação, em vez de serem interpretadas silenciosamente como calendário completo.
+- A regra existente de TTL reduzido (15 minutos) aplica-se a essas respostas, permitindo recuperação após indisponibilidade. Teste estático acrescentado no commit `8970fe6`.
+- **Pendente:** executar CI com as novas alterações e simular respostas HTTP via teste dinâmico controlado. Esta validação não comprova dados oficiais nem homologação em staging.
