@@ -140,3 +140,9 @@ Resultados confirmados no log:
 - O teste exige dois avisos, nenhum feriado regional inventado, TTL de no máximo quinze minutos para resposta degradada e reutilização de cache no segundo acesso.
 - Commit `1e83a5f16ff47bb38ac9258bdb7c09baf139d984`: integração ao release gate com WordPress descartável, sem redes externas reais.
 - CI desta alteração ainda a verificar. Não comprova casos de timeout real, qualidade das fontes oficiais, seleção de município real ou staging.
+
+
+## Ensaio de timeout e indisponibilidade regional
+- Commit `27732e6fab02b63f49ec5d642fda49bc3270c347`: o teste `holiday-provider-degraded.php` passa a simular `WP_Error('http_request_failed')` nas consultas estadual e municipal, além de HTTP 200 com JSON inválido.
+- Critério: duas requisições interceptadas, dois avisos de falha, nenhum feriado regional inventado e expiração do cache em até 15 minutos.
+- São testes sintéticos em WordPress descartável; não comprovam confiabilidade de provedor real, confirmação de feriado oficial ou homologação por município. Resultado do CI ainda pendente.
