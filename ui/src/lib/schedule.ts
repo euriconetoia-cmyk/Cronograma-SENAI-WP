@@ -134,7 +134,7 @@ export function compute(t: Pick<Turma, 'inicio' | 'unidadeId'> & { itens?: Turma
       const ref = it.tipo === 'uc' ? lastMain : it.tipo === 'rec' ? lastUC : prev
       J = ref && ref.c.K ? workdayPermitidos(ref.c.K, 1, hol, diasEstudo) : null
     }
-    if (t.itens?.[it.id]?.inicioPlanejado && it.tipo !== 'intro') J = t.itens[it.id].inicioPlanejado || J
+    if (t.itens?.[it.id]?.inicioPlanejado) J = t.itens[it.id].inicioPlanejado || J
     const K = J ? workdayPermitidos(J, I, hol, diasEstudo) : null
     const nenc = it.tipo === 'uc' ? quantidadeEventosItem(it, curso, 'presencial') : it.tipo === 'intro' ? ((+it.pres || 0) > 0 ? 1 : 0) : 0
     const nsinc = it.tipo === 'uc' ? (perfil.modelo === 'aprendizagem' && J && K && t.inicio ? datasAtendimentoAprendizagem(t.inicio, J, K, curso, hol).length : quantidadeEventosItem(it, curso, 'sincrono')) : 0
