@@ -11,6 +11,7 @@ node --experimental-strip-types --experimental-specifier-resolution=node tests/c
 node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-profiles.mjs
 node --experimental-strip-types --experimental-specifier-resolution=node tests/schedule-multimodel.mjs
 node --experimental-strip-types --experimental-specifier-resolution=node tests/modelos-cronograma.mjs
+node --experimental-strip-types --experimental-specifier-resolution=node tests/end-date-ambientacao.mjs
 node tests/security-static.mjs
 
 command -v pnpm >/dev/null || { echo 'BLOQUEIO: pnpm não instalado.' >&2; exit 20; }
