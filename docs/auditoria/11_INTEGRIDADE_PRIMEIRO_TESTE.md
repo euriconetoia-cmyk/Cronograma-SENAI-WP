@@ -171,3 +171,9 @@ Estado: **Etapa 7 em andamento; testes destrutivos e concorrência ainda não ex
 - Commit `2c9709eef5a5809e18108ced57e5999f018c3884`: `Store::save()` passou a verificar retorno de gravação de dados e revisão; se a segunda gravação falhar, tenta restaurar o valor anterior dos dados e devolve erro `cronograma_ead_gravacao` HTTP 500.
 - Commit `d10e039f5585aadfcdddc555fea62f752441d090`: teste isolado simula falha de `update_option(OPT_REV)` e exige erro explícito e recuperação do catálogo anterior.
 - **Limitação técnica:** compensação por segundo `update_option()` não constitui transação atômica entre duas opções, nem cobre falha da própria compensação. São necessárias validações em WordPress real, falhas de gravação de dados, recuperação do lock após queda e revisão de persistência antes da homologação.
+
+
+## Recuperação falha não deve ser confundida com recuperação concluída
+- Commit `b7de679238d2e1f09751bd3af23c73fa1a27ccca`: ao falhar a atualização da revisão, o sistema testa a gravação compensatória do catálogo. Se a compensação falhar e o dado anterior não tiver sido restaurado, retorna `cronograma_ead_inconsistencia` com mensagem explícita de intervenção/recuperação de backup; não afirma que os dados foram recuperados.
+- Commit `0665e2b2313403b451c04fb39710b643ff9ddc0e`: teste de unidade com falha injetada na atualização de revisão e na compensação, exigindo sinalização de inconsistência crítica.
+- **Atenção:** a alteração detecta falha; não torna duas opções WordPress transacionais. Bloqueio persistente de novas gravações, quarentena operacional e migração para armazenamento atomicamente versionado continuam como trabalho pendente. CI ainda não validado na consulta.
