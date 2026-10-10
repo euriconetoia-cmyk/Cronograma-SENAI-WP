@@ -119,3 +119,11 @@ Resultados confirmados no log:
 - Commit `b98e6a0cd9a7924f935b762d38673128cd59afda`: respostas regionais completas mantêm cache de sete dias; respostas com avisos por falha de integração, indisponibilidade ou ausência de chave municipal passam a ter TTL de quinze minutos. Isso evita manter por uma semana um calendário incompleto após falha temporária.
 - Commit `69b47ff14b60b09dcf2a7c270d64b25b0a4dcff1`: verificação estática no release gate protege a regra de cache reduzido.
 - Trata-se de resiliência técnica, não confirmação do conteúdo das fontes externas. Ainda exige teste dinâmico com provedores offline/timeout e homologação de fontes por UF e município.
+
+
+## CI #352 — falha PHPStan corrigida
+- CI #346: `success`.
+- CI #352: `failure` no PHPStan: `Constant MINUTE_IN_SECONDS not found` (classe de serviço), após introdução do cache regional de 15 minutos.
+- Correção do PHP em `2166d80123b31039228175f685e11b3dd15dfb1f`: `15 * 60` segundos, sem dependência dessa constante no escopo de análise estática.
+- Teste estático alinhado em `6eba3f188c01f01a2bee911d87e6b05accd597ce`.
+- O CI do código corrigido deve ser confirmado antes de considerar a correção validada; homologação de feriados estaduais e municipais ainda pendente.
