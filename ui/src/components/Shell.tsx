@@ -41,6 +41,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const atual = emConfig ? 'config' : page
   return (
     <div className="min-h-screen">
+      <a href="#conteudo-principal" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-card focus:px-4 focus:py-2 focus:text-foreground focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-primary">Pular para o conteúdo principal</a>
       {api.mock && (
         <div className="bg-warn-soft px-4 py-1.5 text-xs text-warn">
           <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-3 gap-y-1">
@@ -70,7 +71,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <MenuUsuario me={me} dark={dark} setDark={setDark} wp={wp} logout={logout} estado={estado} salvo={salvo} />
         </div>
       </header>
-      <main key={page} className="ce-pagina mx-auto max-w-[1500px] px-4 pb-28 pt-5 lg:pb-16">{children}</main>
+      <main id="conteudo-principal" tabIndex={-1} key={page} className="ce-pagina mx-auto max-w-[1500px] px-4 pb-28 pt-5 lg:pb-16">{children}</main>
       <BarraInferior entradas={entradas} atual={atual} count={count} validar={validar} go={go} page={page} />
     </div>
   )
