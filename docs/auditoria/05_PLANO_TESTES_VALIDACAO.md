@@ -133,3 +133,10 @@ Resultados confirmados no log:
 - Commits `820441f1`, `d941ced`, `6f11f17`: consultas estaduais e municipais com HTTP 200 e corpo JSON inválido passam a produzir avisos de degradação, em vez de serem interpretadas silenciosamente como calendário completo.
 - A regra existente de TTL reduzido (15 minutos) aplica-se a essas respostas, permitindo recuperação após indisponibilidade. Teste estático acrescentado no commit `8970fe6`.
 - **Pendente:** executar CI com as novas alterações e simular respostas HTTP via teste dinâmico controlado. Esta validação não comprova dados oficiais nem homologação em staging.
+
+
+## E2E com provedores regionais simulados — 09/10/2026
+- Commit `f0e1838b6d516ba733c8c0c778e35727ac838663`: teste WordPress/WP-CLI usando `pre_http_request` para simular HTTP 200 com JSON inválido tanto na consulta estadual quanto municipal. Usa unidade sintética, chave artificial, cache nacional sintético e bloqueia qualquer consulta de rede não reconhecida.
+- O teste exige dois avisos, nenhum feriado regional inventado, TTL de no máximo quinze minutos para resposta degradada e reutilização de cache no segundo acesso.
+- Commit `1e83a5f16ff47bb38ac9258bdb7c09baf139d984`: integração ao release gate com WordPress descartável, sem redes externas reais.
+- CI desta alteração ainda a verificar. Não comprova casos de timeout real, qualidade das fontes oficiais, seleção de município real ou staging.
