@@ -95,3 +95,9 @@ Resultados confirmados no log:
 - Teste `tests/modelos-cronograma.mjs` ampliado no commit `0ea8e63ee2bec6adf4a3c86ada600c81811c657d` para incluir explicitamente o quinto modelo, **Personalizado**, além de Técnico, Qualificação, Distribuição Diária e Aprendizagem.
 - A suíte ainda depende de CI do novo commit; cobertura matemática/contratual não equivale à homologação visual, de exportação ou dos casos reais de todas as unidades.
 - Testes T-012 a T-021 exigem dados representativos e/ou validação em staging; permanecem abertos. Não executar operação destrutiva em produção.
+
+
+## Cobertura de dias úteis com implementação real
+- CI #328 concluído com `success`, incluindo release gate e empacotamento; permanecem pendentes validações manuais e desempenho.
+- Commits `6882c9d88ae19767ed1f9e3d9e746038edb996b5` e `4872b388930cb195c2aed943744b5c0faff090e4`: `tests/calendar-contract.mjs` deixa de usar sua própria cópia da função `workday` e passa a importar a função real de `ui/src/lib/schedule.ts`, com carregamento TypeScript no release gate.
+- A cobertura verifica o cálculo com as fixtures existentes. Não constitui homologação de feriados estaduais/municipais por fontes oficiais nem validação visual por unidade.
