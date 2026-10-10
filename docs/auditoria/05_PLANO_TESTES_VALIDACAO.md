@@ -158,3 +158,9 @@ Resultados confirmados no log:
 - Commit `c1f01a1ceea1680148bcdc4e5163c2e1976ebf1e`: sonda HTTP anônima com 8 requisições sequenciais aos caminhos `/` e `/?rest_route=/` do WordPress descartável. Registra mínimo, mediana, p95 amostral e máximo em milissegundos, sem armazenar credenciais.
 - Commit `66b667c33776233950d95732a1546b0c416ce5a8`: integrado ao gate após a criação das fixtures WP, antes dos testes E2E.
 - **Interpretação:** p95 com oito amostras sequenciais não estima a experiência em produção, nem testa operações autenticadas, tempo SQL ou desempenho de geração de cronogramas. São números comparativos iniciais do runner; staging e testes de carga/SQL continuam pendentes.
+
+
+## Navegação acessível de menus — etapa UX
+- Commit `306f1643a47fc12dc8b2db2ea5abc15823e7b471`: menus de conta e de navegação móvel passam a responder à tecla Escape enquanto estão abertos, com remoção dos listeners quando fecham.
+- Commit `563143f6421a0887ab439293f97583f423f93944`: gate estático confere a existência das duas ações de fechamento.
+- Ainda não há homologação manual de foco, leitor de tela, responsividade e WCAG. Resultados de CI novos devem ser consultados antes de declarar aprovação.
