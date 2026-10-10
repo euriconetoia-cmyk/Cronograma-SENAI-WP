@@ -21,6 +21,7 @@ export interface Unidade { id: string; nome: string; cidade?: string; estado: st
 export interface Encontro { d: string; h: string; w: string }
 export interface EventoPedagogico { id?: string; tipo: TipoEventoPedagogico; d: string; fim?: string; h?: string; duracaoHoras?: number; titulo?: string; observacao?: string }
 export interface ItemTurma {
+  inicioPlanejado?: string; // marco de início confirmado no recálculo do período
   enc?: Encontro[]; sin?: Encontro[]; eventos?: EventoPedagogico[]; rec?: string; evento?: string
   monitorId?: string; tutorId?: string; coordId?: string; profId?: string; ambiente?: string
   scorm?: string; apostila?: string; aval?: string; pesq?: string; media?: string; idm?: string
