@@ -25,3 +25,11 @@
 
 ## Bloqueio de release
 **Não aprovar G4/G5 nem publicar versão final** sem fechar R01 e R02, executar CI e homologar em staging. Os requisitos foram incluídos após início da etapa 9; portanto etapa 9 não está concluída.
+
+## Implementação técnica — complementação em 09/10/2026
+- Recálculo: `simularRecalculoPeriodo` determina viabilidade mantendo durações e feriados, retrocede a partir da data final e distribui folgas entre etapas intermediárias quando cabíveis. O botão **Recalcular cronograma até o término** executa prévia, verifica conflitos, pede confirmação e recalcula encontros presenciais e síncronos.
+- Persistência: as etapas podem armazenar `inicioPlanejado`; o PHP passa a validar o formato/data em `Cronograma_EAD_Store::sanitize_turma`. Mudança no início da turma limpa marcos calculados, mas preserva a Ambientação manual.
+- Ambientação: criação automática em cursos novos como etapa `intro` com CH zero, regularização em lote de cursos antigos mediante confirmação, data manual no cronograma, preservação no recálculo e exclusão da soma curricular.
+- Regressões: `tests/end-date-ambientacao.mjs` testa os cinco modelos, carga horária integral e limites de intervalo; `tests/catalog-contract.php` verifica a sanitização e a rejeição de datas inválidas.
+- Limite funcional: o redistribuidor conservador não compacta duração pedagógica, não muda horas, não resolve intervalos inviáveis e pode deixar folgas explícitas. Deve apresentar impedimento, não falsificar término.
+- **Homologação:** mudanças implementadas em desenvolvimento; somente marcar como validadas após CI verde e testes operacionais em staging com cursos reais e exportação final. Nenhum deploy de produção foi feito.
