@@ -11,7 +11,7 @@ import { abaPedida, pedidoAberto } from '@/lib/avisos'
 import { root } from '@/lib/root'
 import { useStore } from '@/lib/store'
 import { T } from '@/lib/texts'
-import { compute, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, fimFaseIntensivaAprendizagem, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
+import { compute, simularRecalculoPeriodo, corrigirEncontros, cursoTemMomentos, cursoTemPres, temPres, dow, encontros, encontrosRuins, fmt, momentos, planejarEncontros, planejarSincronicos, sincronicos, fmtShort, feriadosDaTurma, fimFaseIntensivaAprendizagem, situacao, toN, toS, todayStr, verificar, workday, type MomentoInstrucional, type Row, type Situacao } from '@/lib/schedule'
 import { quando } from '@/lib/format'
 import { aplicarConfiguracaoTurma, MODELO_LABEL } from '@/lib/scheduleProfiles'
 import type { ExportEntrada } from '@/lib/export'
@@ -192,6 +192,25 @@ function CronogramaAberto() {
   const semUCs = G.rows.length === 0
   const fimTxt = t.fimManual ? fmt(t.fimManual) : G.end ? fmt(G.end) : ''
   const setFim = (v: string) => update(x => { const a = x.turmas.find(a => a.id === t.id)!; if (v && v !== G.end) a.fimManual = v; else delete a.fimManual })
+  const recalcularPeriodo = () => {
+    if (!podeCalcular || !t.inicio || !t.fimManual) return
+    const semMarcos = { ...t, itens: Object.fromEntries(Object.entries(t.itens).map(([id, it]) => [id, { ...it, inicioPlanejado: undefined }])) }
+    const sim = simularRecalculoPeriodo(semMarcos, curso, d.feriados, t.fimManual)
+    if (!sim.ok) { window.alert(sim.motivo); return }
+    const ultimo = sim.plano.rows.at(-1)
+    if (!ultimo?.c.J) { window.alert('Não foi possível recalcular o período.'); return }
+    const teste = compute({ ...semMarcos, itens: { ...semMarcos.itens, [ultimo.it.id]: { ...(semMarcos.itens[ultimo.it.id] || {}), inicioPlanejado: ultimo.c.J } } }, curso, d.feriados)
+    if (teste.end !== t.fimManual) { window.alert('O calendário não alcançou o término solicitado. Nenhum dado foi alterado.'); return }
+    if (!window.confirm('Recalcular o período até ' + fmt(t.fimManual) + '? Os encontros e momentos síncronos existentes serão substituídos para acompanhar as novas datas.')) return
+    update(x => {
+      const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
+      for (const item of Object.values(tt.itens)) { delete item.inicioPlanejado; delete item.enc; delete item.sin }
+      tt.itens[ultimo.it.id] = { ...(tt.itens[ultimo.it.id] || {}), inicioPlanejado: ultimo.c.J! }
+      const g = compute(tt, curso, x.feriados)
+      for (const [id, enc] of Object.entries(planejarEncontros(tt, g, x.feriados, false))) tt.itens[id] = { ...(tt.itens[id] || {}), enc }
+      for (const [id, sin] of Object.entries(planejarSincronicos(tt, g, x.feriados, false))) tt.itens[id] = { ...(tt.itens[id] || {}), sin }
+    })
+  }
 
   const colsEquipe = gv.equipe ? 2 : 0, colsEnc = gv.encontros ? 7 : 0, colsPres = gv.presencial ? 3 : 0, colsSup = grupos.suporte && me.perfil === 'equipe' ? 6 : 0
   const ncol = 9 + colsEquipe + colsEnc + colsPres + colsSup
@@ -237,6 +256,7 @@ function CronogramaAberto() {
           <Field label="Início da turma"><input type="date" className="field-input" disabled={!podeCalcular} value={t.inicio} onChange={e => mudarInicio(e.target.value)} /></Field>
           <Field label={G.end ? 'Término previsto' : 'Término previsto (informe uma data possível)'}>
             <input type="date" className="field-input" disabled={!podeCalcular} value={t.fimManual || G.end || ''} onChange={e => setFim(e.target.value)} />
+            {podeCalcular && t.fimManual && <button type="button" className="mt-2 rounded-md bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground" onClick={recalcularPeriodo}>Recalcular cronograma até o término</button>}
             {G.end && (t.fimManual
               ? <p className="mt-1 text-xs text-muted-foreground">Data alterada manualmente. Calculado: <b className="mono">{fmt(G.end)}</b>{t.fimManual < G.end ? ' (a nova data é anterior ao cálculo)' : ''}. {podeCalcular && <button type="button" className="underline" onClick={() => setFim('')}>Voltar ao cálculo</button>}</p>
               : <p className="mt-1 text-xs text-muted-foreground">Calculado pelas cargas e feriados. Você pode estender ou alterar a data.</p>)}
