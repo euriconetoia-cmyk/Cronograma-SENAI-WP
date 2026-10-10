@@ -13,6 +13,8 @@ const ui = read('ui/src/pages/Acessos.tsx');
 const schedule = read('ui/src/lib/schedule.ts');
 const cronograma = read('ui/src/pages/Cronograma.tsx');
 const shell = read('ui/src/components/Shell.tsx');
+const cursosPage = read('ui/src/pages/Cursos.tsx');
+checks.push([cursosPage.includes("nome: 'Ambientação', ch: 0, pres: 0, div: 0") && cursosPage.includes("novoItem('intro')"), 'Ambientacao is an introductory non-credit stage for new and existing courses']);
 const integracoes = read('ui/src/pages/Integracoes.tsx');
 
 checks.push([shell.includes('href="#conteudo-principal"') && shell.includes('id="conteudo-principal"') && shell.includes('tabIndex={-1}'), 'Keyboard skip link targets focusable main landmark']);
