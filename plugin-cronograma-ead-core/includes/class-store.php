@@ -59,6 +59,8 @@ class Cronograma_EAD_Store {
 		// O antigo get_transient/set_transient permitia que duas requisicoes
 		// adquirissem o mesmo lock simultaneamente.
 		$lock = 'cronograma_ead_catalog_write_lock';
+		// Um mutex abandonado exige intervenção explícita: não apagar automaticamente,
+		// pois um escritor legítimo pode continuar ativo mesmo após expirar um TTL.
 		if ( ! add_option( $lock, time(), '', false ) ) {
 			return new WP_Error( 'cronograma_ead_ocupado', 'Outra gravação está em andamento. Tente de novo.', array( 'status' => 503 ) );
 		}
