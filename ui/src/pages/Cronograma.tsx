@@ -197,15 +197,27 @@ function CronogramaAberto() {
     const semMarcos = { ...t, itens: Object.fromEntries(Object.entries(t.itens).map(([id, it]) => [id, { ...it, inicioPlanejado: curso.modulos.some(m => m.itens.some(item => item.id === id && item.tipo === 'intro' && item.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação')) ? it.inicioPlanejado : undefined }])) }
     const sim = simularRecalculoPeriodo(semMarcos, curso, d.feriados, t.fimManual)
     if (!sim.ok) { window.alert(sim.motivo); return }
-    const ultimo = sim.plano.rows.at(-1)
-    if (!ultimo?.c.J) { window.alert('Não foi possível recalcular o período.'); return }
-    const teste = compute({ ...semMarcos, itens: { ...semMarcos.itens, [ultimo.it.id]: { ...(semMarcos.itens[ultimo.it.id] || {}), inicioPlanejado: ultimo.c.J } } }, curso, d.feriados)
-    if (teste.end !== t.fimManual) { window.alert('O calendário não alcançou o término solicitado. Nenhum dado foi alterado.'); return }
-    if (!window.confirm('Recalcular o período até ' + fmt(t.fimManual) + '? Os encontros e momentos síncronos existentes serão substituídos para acompanhar as novas datas.')) return
+    const marcos = Object.fromEntries(sim.plano.rows
+      .filter(r => r.it.tipo !== 'intro' && r.c.J)
+      .map(r => [r.it.id, r.c.J!]))
+    const itensSimulados = { ...semMarcos.itens }
+    for (const [id, data] of Object.entries(marcos))
+      itensSimulados[id] = { ...(itensSimulados[id] || {}), inicioPlanejado: data }
+    const teste = compute({ ...semMarcos, itens: itensSimulados }, curso, d.feriados)
+    if (teste.end !== t.fimManual || teste.rows.some((r, i) =>
+      i > 0 && r.it.tipo === 'uc' && r.c.J && teste.rows[i - 1].c.K && r.c.J <= teste.rows[i - 1].c.K!)) {
+      window.alert('O calendário não alcançou o término solicitado sem conflitos. Nenhum dado foi alterado.')
+      return
+    }
+    if (!window.confirm('Recalcular o período até ' + fmt(t.fimManual) + '? As UCs serão redistribuídas e os encontros/síncronos já digitados serão substituídos.')) return
     update(x => {
       const tt = x.turmas.find(a => a.id === t.id); if (!tt) return
-      for (const [id, item] of Object.entries(tt.itens)) { if (curso.modulos.some(m => m.itens.some(it => it.id === id && it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) continue; delete item.inicioPlanejado; delete item.enc; delete item.sin }
-      tt.itens[ultimo.it.id] = { ...(tt.itens[ultimo.it.id] || {}), inicioPlanejado: ultimo.c.J! }
+      for (const [id, item] of Object.entries(tt.itens)) {
+        if (curso.modulos.some(m => m.itens.some(it => it.id === id && it.tipo === 'intro' && it.nome.trim().toLocaleLowerCase('pt-BR') === 'ambientação'))) continue
+        delete item.inicioPlanejado; delete item.enc; delete item.sin
+      }
+      for (const [id, data] of Object.entries(marcos))
+        tt.itens[id] = { ...(tt.itens[id] || {}), inicioPlanejado: data }
       const g = compute(tt, curso, x.feriados)
       for (const [id, enc] of Object.entries(planejarEncontros(tt, g, x.feriados, false))) tt.itens[id] = { ...(tt.itens[id] || {}), enc }
       for (const [id, sin] of Object.entries(planejarSincronicos(tt, g, x.feriados, false))) tt.itens[id] = { ...(tt.itens[id] || {}), sin }
