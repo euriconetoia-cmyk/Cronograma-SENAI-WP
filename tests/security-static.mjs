@@ -12,6 +12,8 @@ const notify = read('plugin-cronograma-ead-core/includes/class-notify.php');
 const ui = read('ui/src/pages/Acessos.tsx');
 const schedule = read('ui/src/lib/schedule.ts');
 const cronograma = read('ui/src/pages/Cronograma.tsx');
+checks.push([schedule.includes('export function simularRecalculoPeriodo') && cronograma.includes('Recalcular cronograma até o término') && cronograma.includes('teste.end !== t.fimManual'), 'Manual end-date recalculation has preflight and confirmation']);
+checks.push([cronograma.includes('Data da Ambientação (manual, fora da CH)') && schedule.includes('inicioPlanejado'), 'Ambientacao manual date supported without curricular hours']);
 const shell = read('ui/src/components/Shell.tsx');
 const cursosPage = read('ui/src/pages/Cursos.tsx');
 checks.push([cursosPage.includes("nome: 'Ambientação', ch: 0, pres: 0, div: 0") && cursosPage.includes("novoItem('intro')"), 'Ambientacao is an introductory non-credit stage for new and existing courses']);
