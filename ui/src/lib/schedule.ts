@@ -73,6 +73,51 @@ export interface Result { curso: Curso; rows: Row[]; by: Record<string, Row>; en
 /** Feriados que valem para a turma: os gerais e os da unidade dela. */
 export const feriadosDaTurma = (t: { unidadeId: string }, feriados: Feriado[]) => feriados.filter(f => !f[2] || f[2] === t.unidadeId)
 
+/**
+ * Simula uma redistribuição conservadora entre início e fim.
+ * Mantém integralmente a duração pedagógica de cada etapa; nunca comprime horas.
+ * Apenas acrescenta folgas entre etapas para atingir uma data posterior ao cálculo base.
+ * Não persiste alterações: quem chama deve confirmar e salvar a nova configuração.
+ */
+export function simularRecalculoPeriodo(
+  t: Pick<Turma, 'inicio' | 'unidadeId'>,
+  curso: Curso,
+  feriados: Feriado[],
+  fim: string
+): { ok: true; plano: Result } | { ok: false; motivo: string } {
+  if (!t.inicio || !/^\\d{4}-\\d{2}-\\d{2}$/.test(fim) || fim < t.inicio)
+    return { ok: false, motivo: 'Informe datas válidas de início e término, em ordem cronológica.' }
+  const base = compute(t, curso, feriados)
+  if (!base.end || !base.rows.length) return { ok: false, motivo: 'O curso não possui etapas calculáveis.' }
+  if (fim < base.end) return { ok: false, motivo: `O intervalo é insuficiente: mantendo a carga horária e as regras atuais, o primeiro término possível é ${br(base.end)}.` }
+  if (fim === base.end) return { ok: true, plano: base }
+  const hol = new Set(feriadosDaTurma(t, feriados).map(f => f[0]))
+  const ultimo = base.rows[base.rows.length - 1]
+  const dias = resolverPerfilItem(ultimo.it, curso).diasEstudoPermitidos
+  const dateValid = (v: string) => !hol.has(v) && (dias.length ? dias : [1, 2, 3, 4, 5]).includes(dow(toN(v)))
+  if (!dateValid(fim)) return { ok: false, motivo: 'O término solicitado cai em feriado ou dia não permitido pelo modelo da última etapa.' }
+  // A folga deve ser composta de dias permitidos da última etapa, sem inventar carga horária.
+  let acrescentar = 0, data = base.end
+  while (data < fim && acrescentar <= 3660) {
+    data = workdayPermitidos(data, 1, hol, dias)
+    acrescentar++
+  }
+  if (data !== fim) return { ok: false, motivo: 'Não foi possível alinhar o término às regras de calendário do curso.' }
+  // Uma única etapa não recebe folga artificial; precisamos preservar a duração fixa da UC.
+  if (base.rows.length < 2) return { ok: false, motivo: 'Não é possível alongar uma única etapa sem alterar sua duração ou as regras do curso.' }
+  // Aplica a folga antes da última etapa. Esta solução conservadora mantém as UCs anteriores intactas.
+  const rows = base.rows.map(r => ({ ...r, c: { ...r.c } }))
+  const last = rows[rows.length - 1]
+  if (!last.c.J || !last.c.K) return { ok: false, motivo: 'A última etapa não possui datas calculadas.' }
+  const inicioDeslocado = workdayPermitidos(last.c.J, acrescentar, hol, dias)
+  const fimDeslocado = workdayPermitidos(last.c.K, acrescentar, hol, dias)
+  if (fimDeslocado !== fim) return { ok: false, motivo: 'Não foi possível preservar a duração pedagógica da etapa final nesse calendário.' }
+  last.c.J = inicioDeslocado
+  last.c.K = fimDeslocado
+  const by = Object.fromEntries(rows.map(r => [r.it.id, r])) as Record<string, Row>
+  return { ok: true, plano: { ...base, rows, by, end: fim } }
+}
+
 export function compute(t: Pick<Turma, 'inicio' | 'unidadeId'>, curso: Curso, feriados: Feriado[]): Result {
   const hol = new Set(feriadosDaTurma(t, feriados).map(f => f[0]))
   const rows: Row[] = []
