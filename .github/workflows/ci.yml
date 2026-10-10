@@ -34,9 +34,10 @@ jobs:
       - if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: cronograma-ead-2.21.0-rc1
+          name: cronograma-ead-2.21.0-rc2
           path: |
             dist/*.zip
+            dist/SHA256SUMS
             plugin-cronograma-ead-core/assets/app.js
       - if: always()
         uses: actions/upload-artifact@v4
