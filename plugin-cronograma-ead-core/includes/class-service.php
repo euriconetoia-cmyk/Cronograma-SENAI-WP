@@ -855,7 +855,13 @@ class Cronograma_EAD_Service {
 		$url_estado = add_query_arg( 'uf', $uf, 'https://brasilapi.com.br/api/feriados/v1/' . $ano );
 		$res = wp_safe_remote_get( $url_estado, array( 'timeout' => 10, 'redirection' => 2, 'headers' => array( 'Accept' => 'application/json' ) ) );
 		if ( ! is_wp_error( $res ) && 200 === (int) wp_remote_retrieve_response_code( $res ) ) {
-			foreach ( (array) json_decode( wp_remote_retrieve_body( $res ), true ) as $item ) {
+			$body_estado = json_decode( wp_remote_retrieve_body( $res ), true );
+			if ( ! is_array( $body_estado ) || ! array_is_list( $body_estado ) ) {
+				$avisos[] = 'A fonte estadual retornou dados inválidos.';
+				$body_estado = array();
+			}
+			foreach ( $body_estado as $item ) {
+				if ( ! is_array( $item ) ) continue;
 				$data = isset( $item['date'] ) ? sanitize_text_field( (string) $item['date'] ) : '';
 				$nome = isset( $item['name'] ) ? sanitize_text_field( (string) $item['name'] ) : 'Feriado estadual';
 				if ( Cronograma_EAD_Rules::data_ok( $data ) && ! isset( $datas_nacionais[ $data ] ) ) $out[] = array( $data, $nome, 'estadual', 'BrasilAPI' );
